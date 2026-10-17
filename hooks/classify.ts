@@ -238,7 +238,21 @@ export function bashWrites(command: string): string[] {
 }
 
 // `sed -n` takes its script first (`sed -n 28,100p file`), so the path is the word after it.
-const READ_CMD = /^\s*(cat|head|tail|less|bat|sed\s+-n\s+(?:'[^']*'|"[^"]*"|\S+))\s+(?:-\S+\s+)*([^\s|;&>]+)/
+const READ_CMD = /^\s*(cat|head|tail|less|bat|sed\s+-n\s+(?:\x01\d+\x01|\S+))\s+(?:-\S+\s+)*([^\s|;&>-][^\s|;&>]*)/
+
+/** Paths the command's parts read with cat, head, tail, less, bat or sed -n. */
+export function bashReads(command: string): string[] {
+  const w = shellWords(command)
+  const out: string[] = []
+  for (const { part, dir, vars } of partsOf(w)) {
+    const m = READ_CMD.exec(part)
+    const path = m ? place(unquote(m[2]!, w), dir, vars) : null
+    if (path !== null && !out.includes(path)) out.push(path)
+  }
+  return out
+}
+// A runner's output piped into a filter: the lines a parser counts are not all there.
+const FILTERED = /\|\s*(grep|egrep|rg|head|tail|awk|sed|cut)\b/
 const SEARCH_CMD = /^\s*(rg|grep|egrep|ag|find|fd|ls)\b(.*)$/
 
 const PATTERN_MAX = 80
@@ -267,30 +281,32 @@ export function classify(tool: string, input: unknown, result: unknown, isError:
     return [{ kind: 'change', change }]
   }
 
+  // One command can do several jobs (`rm x && go test ./...`, `go test; cat a_test.go`): the card counts each one.
   if (tool === 'Bash') {
     const command = str(i.command) ?? ''
+    const out: ClassifiedCall[] = []
     const runner = detectRunner(command)
     if (runner !== null) {
       const r = obj(result)
       const output = `${str(r.stdout) ?? ''}\n${str(r.stderr) ?? ''}`
-      return [{ kind: 'test', run: { command, runner, ...parseResult(runner, output), isError } }]
+      const { byLine, ...counts } = parseResult(runner, output)
+      // Counted result lines piped through grep or tail are only some of them: keep the failures seen, drop the rest.
+      if (byLine === true && FILTERED.test(command)) Object.assign(counts, { passed: null, failed: counts.failed !== null && counts.failed > 0 ? counts.failed : null })
+      // A pipe hides the runner's exit code (`go test | tail` exits with tail's), so a failure in the output is an error.
+      out.push({ kind: 'test', run: { command, runner, ...counts, isError: isError || (counts.failed ?? 0) > 0 } })
     }
-    const gone = isError ? [] : rmTargets(command)
-    if (gone.length > 0)
-      return gone.map(p => {
-        const at = placePath(p, root)
-        return { kind: 'change', change: { path: at.path, added: 0, removed: 0, viaBash: true, isTest: isTestPath(at.path), isDelete: true, outsideRoot: at.outsideRoot, addsSkip: false } }
-      })
-    const written = isError ? [] : bashWrites(command)
-    if (written.length > 0)
-      return written.map(p => {
-        const at = placePath(p, root)
-        return { kind: 'change', change: { path: at.path, added: 0, removed: 0, viaBash: true, isTest: isTestPath(at.path), isDelete: false, outsideRoot: at.outsideRoot, addsSkip: false } }
-      })
-    const read = READ_CMD.exec(command)
-    if (read) return [{ kind: 'read', path: read[2]! }]
-    const search = SEARCH_CMD.exec(command)
-    if (search) return [{ kind: 'search', pattern: searchPattern(command) }]
+    // A failed command may not have run its rm or its write. With a test run, the error is the test's, so they count.
+    const ran = !isError || runner !== null
+    const bashChange = (p: string, isDelete: boolean): ClassifiedCall => {
+      const at = placePath(p, root)
+      return { kind: 'change', change: { path: at.path, added: 0, removed: 0, viaBash: true, isTest: isTestPath(at.path), isDelete, outsideRoot: at.outsideRoot, addsSkip: false } }
+    }
+    const gone = ran ? rmTargets(command) : []
+    const written = ran ? bashWrites(command).filter(p => !gone.includes(p)) : []
+    out.push(...written.map(p => bashChange(p, false)), ...gone.map(p => bashChange(p, true)))
+    if (runner === null && written.length === 0 && SEARCH_CMD.test(command)) out.push({ kind: 'search', pattern: searchPattern(command) })
+    for (const p of bashReads(command)) if (!written.includes(p) && !gone.includes(p)) out.push({ kind: 'read', path: placePath(p, root).path })
+    if (out.length > 0) return out
   }
 
   return [{ kind: 'other', tool }]

@@ -68,7 +68,7 @@ test('runners: cargo adds up every test binary', async () => {
 })
 
 test('runners: go test counts -v lines, and gives no counts without them', async () => {
-  expect(parseResult('go test', '=== RUN TestA\n--- PASS: TestA (0.00s)\n--- FAIL: TestB (0.01s)\n--- SKIP: TestC\nFAIL')).toEqual({ passed: 1, failed: 1, skipped: 1 })
+  expect(parseResult('go test', '=== RUN TestA\n--- PASS: TestA (0.00s)\n--- FAIL: TestB (0.01s)\n--- SKIP: TestC\nFAIL')).toEqual({ passed: 1, failed: 1, skipped: 1, byLine: true })
   expect(parseResult('go test', 'ok  \texample.com/pkg\t0.12s')).toEqual({ passed: null, failed: null, skipped: null })
 })
 
