@@ -8,6 +8,7 @@ export type Features = {
   trust: boolean
   keep: boolean
   actions: boolean // clean copy, diff
+  context: boolean // the context bar above the prompt
 }
 
 function flag(options: PluginOptions, key: string): boolean {
@@ -16,5 +17,5 @@ function flag(options: PluginOptions, key: string): boolean {
 
 export function readFeatures(options: PluginOptions): Features {
   const card = flag(options, 'card')
-  return { card, motion: flag(options, 'motion'), animation: flag(options, 'animation'), trust: card && flag(options, 'trust'), keep: card && flag(options, 'keep'), actions: card && flag(options, 'actions') }
+  return { card, motion: flag(options, 'motion'), animation: flag(options, 'animation'), trust: card && flag(options, 'trust'), keep: card && flag(options, 'keep'), actions: card && flag(options, 'actions'), context: flag(options, 'context') }
 }

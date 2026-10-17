@@ -9,6 +9,9 @@ import { classify, placePath } from './classify'
 import { unifiedDiff } from './netdiff'
 import { drawCard, PULSE_MS } from './draw/card'
 import { drawBand, keptNote, revealKeys } from './draw/band'
+import { CONTEXT_PANE, drawContextPane } from './draw/context'
+import { contextFill } from './context'
+import type { ContextFill } from './context'
 import { drawCompactLine } from './draw/compact-line'
 import { DETAIL_PANE, drawDetail, paneRows, paneTitle, sectionOf } from './draw/detail'
 import type { Section } from './draw/detail'
@@ -23,7 +26,7 @@ import { activityWord, isMeta, logLines, runName } from './summary'
 import { checkTurn } from './trust'
 import { endTurn, isInterim, recordCall, recordStep, startTurn, toKept } from './turn'
 
-const HELP = 'TL;DR is on. Click a card row for its detail, or /tldr show [changed|tests|check|ran|looked] · /tldr history · /tldr copy · /tldr diff'
+const HELP = 'TL;DR is on. Click a card row for its detail, or /tldr show [changed|tests|check|ran|looked] · /tldr context · /tldr history · /tldr copy · /tldr diff'
 
 // The frame loop repaints the spinner between renders (module state: a reload restarts it).
 const FRAME_MS = 80
@@ -34,6 +37,9 @@ let spinnerSite: { requestId: string; mode: SpinnerMode } | null = null
 let diffFor: string | null = null
 // What the detail pane shows: the turn and the row pressed last (or /tldr show).
 let detailFor: { turnId: string; section: Section | 'all' } | null = null
+// The context window by category, as the band's bar draws it: measured after each request (a local estimate).
+let contextNow: ContextFill | null = null
+let measuring = false
 // Each edited file's text before the open turn's first edit of it, for the turn's net diff (null: too large).
 let openTurnId: string | null = null
 let befores = new Map<string, string | null>()
@@ -64,8 +70,9 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const r = await next(e)
     await $.command
-      .register({ name: 'tldr', description: 'TL;DR for Claude Code: turn cards', argumentHint: '[show|history|copy|diff]' })
+      .register({ name: 'tldr', description: 'TL;DR for Claude Code: turn cards', argumentHint: '[show|context|history|copy|diff]' })
       .catch(() => {})
+    if (f.context) await measureContext($)
     // A resumed session: its earlier cards are on disk, its earlier rows are not on screen.
     if (f.keep) {
       const list = await loadKept($).catch(() => [])
@@ -131,6 +138,7 @@ export const register: Register = (on, options) => {
     const r = yield* next(e)
     if (e.agentId === undefined) {
       await updateTurn($, r.turnId, t => recordStep(t, r.answer, r.toolUses.length > 0)).catch(() => {})
+      if (f.context) void measureContext($)
     }
     return r
   })
@@ -158,6 +166,11 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'tldr' }, async ($, e) => {
     const sub = e.args.trim().toLowerCase()
+    if (sub === 'context') {
+      if (!f.context) return { text: 'TL;DR: the context bar is off. Turn it on in /plugin, TL;DR options.' }
+      await openContext($)
+      return { text: contextNow === null ? 'TL;DR: no context figures yet.' : `TL;DR: context opened, ${contextNow.percent}% used. Escape closes it.` }
+    }
     if (!f.card) return { text: 'TL;DR: the turn card is off. Turn it on in /plugin, TL;DR options.' }
     // One card, one detail: `show` opens what sits behind a row. `expand` is kept as a word for it.
     const [verb = '', arg = ''] = sub.split(/\s+/)
@@ -275,8 +288,9 @@ export const register: Register = (on, options) => {
     // On the main screen the printed card can't take a press, so its rows sit on the band as digit keys.
     const t = f.card && e.viewport?.isFullscreen === false && !e.props.isWorking ? await lastTurn($, f.keep) : null
     const reveal = t !== null && t.endedAt !== null ? { turnId: t.id, keys: revealKeys(t), show: (s: Section | 'all') => void showDetail($, t, s) } : null
-    if (note === null && reveal === null) return rest
-    return drawBand($, e, rest ?? null, { note, reveal })
+    const context = f.context && contextNow !== null ? { fill: contextNow, open: () => void openContext($) } : null
+    if (note === null && reveal === null && context === null) return rest
+    return drawBand($, e, rest ?? null, { note, reveal, context })
   })
 
   // After a compaction the earlier rows are gone from the screen; the band points to the kept cards.
@@ -295,9 +309,11 @@ export const register: Register = (on, options) => {
       if (!inTurn) endLoop()
     })
     if (f.keep && e.agentId === undefined && 'messages' in r) await setKept($, k => ({ ...k, note: k.count > 0 })).catch(() => {})
+    if (f.context && e.agentId === undefined) await measureContext($)
     return r
   })
 
+  on('ui.render', { component: 'Pane', requestId: CONTEXT_PANE }, async ($, e) => drawContextPane($, e, contextNow))
   on('ui.render', { component: 'Pane', requestId: HISTORY_PANE }, async ($, e) => drawHistory($, e, await loadKept($).catch(() => [])))
 
   on('ui.render', { component: 'Pane', requestId: DETAIL_PANE }, async ($, e) => {
@@ -341,6 +357,29 @@ async function showDetail($: EngineInterface, t: Turn, section: Section | 'all')
   detailFor = { turnId: t.id, section }
   await $.ui.open({ id: DETAIL_PANE, title: paneTitle(t, section), focus: true, closeOnEscape: true, rows: paneRows(t, section) })
   $.ui.invalidate('ui.render')
+}
+
+/** The context window by category, as /context counts it but estimated locally, so it costs no request. */
+async function measureContext($: EngineInterface) {
+  if (measuring) return
+  measuring = true
+  try {
+    const u = await $.session.usage({ breakdown: 'summary' })
+    const b = u.context.breakdown
+    if (b !== undefined && b.rawMaxTokens > 0) {
+      contextNow = contextFill(b)
+      $.ui.invalidate('ui.render')
+    }
+  } catch {
+    // No figures: the bar keeps its last ones.
+  } finally {
+    measuring = false
+  }
+}
+
+async function openContext($: EngineInterface) {
+  await measureContext($)
+  await $.ui.open({ id: CONTEXT_PANE, title: 'TL;DR context', focus: true, closeOnEscape: true, rows: (contextNow?.slices.length ?? 1) + 3 })
 }
 
 async function openDiff($: EngineInterface, t: Turn) {

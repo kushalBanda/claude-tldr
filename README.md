@@ -28,6 +28,7 @@ Answer `y` to add the marketplace, then pick a scope (user is the first one). Th
 - **Turn card:** one card per turn in place of the tool rows. It shows the goal, the time, the size of the turn (`3 files +18 −6`) and its files, the test runs in order, the other commands in one Ran row (`git ×3 · gh`), and what Claude read and searched. The text Claude writes between tool calls folds into the card. The final reply stays.
 - **Trust flags:** the card turns amber and says what to check: a test file changed in the turn that made tests pass, a write outside the project, a deleted file, an added skip, only or xfail marker, `--no-verify`, or a force push.
 - **Click to reveal:** click a row and a pane shows what is behind it. Click the goal and the pane shows the turn as steps.
+- **Context bar:** one line above the prompt shows what fills the context window, by category, in Plotly colors: system prompt, tools, memory files, skills, messages, then the free space and the compaction buffer. The label reads `62% · 124k/200k`. It turns amber at 75% and red at 90%, and then it points to `/compact`. You decide when to compact. Type `7` into the empty prompt, or run `/tldr context`, to list each category with its tokens.
 - **Motion:** a spinner that shows the mode (thinking, running tools, writing) and the current job (`Reading src/auth.py`). It also moves during `/compact`.
 - **Kept cards:** each finished card is saved for the session. After `/compact` or a resume, `/tldr history` shows the earlier turns.
 - **Actions:** copy the reply as clean text, or see the net diff of the turn.
@@ -49,6 +50,7 @@ On desktop and in VS Code, Claude Code draws its own rows. The card is for the t
 | --- | --- |
 | `/tldr` | Help. |
 | `/tldr show [row]` | Open what's behind a row of the latest card: `changed`, `tests`, `check`, `ran`, `looked`, `notes`. With no row, the steps of the turn in order. Escape closes it. |
+| `/tldr context` | Open the context pane: each category that fills the window, with its tokens and share. |
 | `/tldr history` | Open the kept cards of this session, newest first. |
 | `/tldr copy` | Copy the latest reply as clean text: no trailing spaces, no shared indentation. |
 | `/tldr diff` | Print the net change of the latest turn per file, as a unified diff. |
@@ -62,6 +64,7 @@ Every feature is a switch, and all are on by default. Change them with `/plugin 
 | `card` | Claude Code's own rows. Also turns off `trust`, `keep` and `actions`. |
 | `motion` | Claude Code's own spinner. |
 | `animation` | Motion keeps its colors but doesn't move. |
+| `context` | No context bar. |
 | `trust` | No Check row, no amber border. |
 | `keep` | Nothing saved, no note after `/compact`. |
 | `actions` | No buttons, no copy or diff commands. |
@@ -73,7 +76,7 @@ pytest, unittest, jest, vitest, Playwright, go test, gotestsum, cargo test and n
 ## Privacy and trust
 
 - **No network.** TL;DR makes no network calls and starts no processes.
-- **Local only.** It reads the tool calls and results of your session, and the files Claude edits, to build the net diff. Kept cards stay in Claude Code's local plugin store: one list per session, at most 50 cards, without diff bodies.
+- **Local only.** It reads the tool calls and results of your session, and the files Claude edits, to build the net diff. The context bar uses Claude Code's local estimate of the window, so it sends no request. Kept cards stay in Claude Code's local plugin store: one list per session, at most 50 cards, without diff bodies.
 - **Check it yourself.** Before you install, run `claude plugin validate` on a clone. The `hooks:` and `calls:` lines list every event the mod handles and every API it calls.
 
 ## Limits

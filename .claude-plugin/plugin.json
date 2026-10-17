@@ -28,6 +28,12 @@
       "description": "Moving frames and short pulses. Off: motion keeps static colors only.",
       "default": true
     },
+    "context": {
+      "type": "boolean",
+      "title": "Context bar",
+      "description": "A bar above the prompt: what fills the context window, by category, and how much is left. /tldr context lists it.",
+      "default": true
+    },
     "trust": {
       "type": "boolean",
       "title": "Trust flags",

@@ -1,7 +1,10 @@
-// The band above the prompt: the kept-cards note after /compact, and on the main screen the rows of the latest card as keys.
+// The band above the prompt: the context bar, the kept-cards note after /compact, and on the main screen the rows of the latest card as keys.
 import type { EngineInterface, RenderElement, RenderInput } from 'claude-code'
 
 import type { Turn } from '../../types'
+import { contextCells, contextLabel, contextLevel } from '../context'
+import type { ContextFill } from '../context'
+import { encodeCells } from '../motion'
 import type { Section } from './detail'
 import { color } from './theme'
 
@@ -26,11 +29,20 @@ export function revealKeys(t: Turn): Reveal[] {
 }
 
 export type BandReveal = { turnId: string; keys: Reveal[]; show: (s: Section | 'all') => void }
-export type BandParts = { note: string | null; reveal: BandReveal | null }
+export type BandContext = { fill: ContextFill; open: () => void }
+export type BandParts = { note: string | null; reveal: BandReveal | null; context: BandContext | null }
+
+export const CONTEXT_KEY = 'tldr-context-bar'
+const CONTEXT_HOTKEY = '7'
 
 export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest: RenderElement | null, parts: BandParts) {
-  const { Box, Text, Button } = $.ui.resolve(e as RenderInput<'AbovePrompt', 'terminal'>)
+  const { Box, Text, Button, Raster } = $.ui.resolve(e as RenderInput<'AbovePrompt', 'terminal'>)
   const reveal = parts.reveal
+  const ctx = parts.context
+  const label = ctx !== null ? contextLabel(ctx.fill) : ''
+  const level = ctx !== null ? contextLevel(ctx.fill.percent) : 'ok'
+  // The label and its hotkey take their own cells; the bar takes the rest.
+  const barColumns = Math.max(4, e.props.bodyColumns - label.length - 4)
   return (
     <Box key="tldr-bands" flexDirection="column">
       {rest}
@@ -41,6 +53,14 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest
           {reveal.keys.map(k => (
             <Button key={`tldr-reveal:${k.section}:${reveal.turnId}`} label={k.label} hotkey={k.hotkey} plain dimColor onPress={() => reveal.show(k.section)} />
           ))}
+        </Box>
+      ) : null}
+      {ctx !== null ? (
+        <Box key="tldr-context-row" flexDirection="row" columnGap={1}>
+          <Raster key={CONTEXT_KEY} columns={barColumns} rows={1} cells={encodeCells(contextCells(ctx.fill, barColumns))} />
+          <Button key="tldr-context-open" hotkey={CONTEXT_HOTKEY} plain onPress={ctx.open}>
+            <Text color={level === 'full' ? color.fail : level === 'warn' ? color.check : color.dim}>{label}</Text>
+          </Button>
         </Box>
       ) : null}
     </Box>
