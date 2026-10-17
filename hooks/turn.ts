@@ -41,7 +41,6 @@ export function startTurn(id: string, prompt: string, now: number): Turn {
     ran: [],
     interim: [],
     reply: null,
-    expanded: false,
     pulse: null,
     flags: [],
     diffs: [],
@@ -68,7 +67,10 @@ const LOG_MAX = 300 // lines kept per turn
 export function recordCall(t: Turn, toolUseId: string, calls: ClassifiedCall[], line?: string, ran?: string): Turn {
   let next: Turn = t.toolUseIds.includes(toolUseId) ? t : { ...t, toolUseIds: [...t.toolUseIds, toolUseId] }
   if (line !== undefined) next = { ...next, log: [...next.log, line].slice(-LOG_MAX) }
-  if (ran !== undefined && calls.length > 0 && calls.every(c => c.kind === 'other')) next = { ...next, ran: [...(next.ran ?? []), ran].slice(-LOG_MAX) }
+  if (ran !== undefined && calls.length > 0 && calls.every(c => c.kind === 'other')) {
+    next = { ...next, ran: [...(next.ran ?? []), ran].slice(-LOG_MAX) }
+    if (line !== undefined) next = { ...next, ranLog: [...(next.ranLog ?? []), line].slice(-LOG_MAX) }
+  }
   for (const c of calls) {
     if (c.kind === 'read') next = { ...next, reads: next.reads.includes(c.path) ? next.reads : [...next.reads, c.path] }
     else if (c.kind === 'search') next = { ...next, searches: [...next.searches, c.pattern] }
@@ -104,5 +106,5 @@ const KEPT_LOG_MAX = 40
 /** A finished turn trimmed for disk: no folded text, no diff lines, a capped reply and log, no live state. */
 export function toKept(t: Turn): Turn {
   const reply = t.reply === null ? null : t.reply.length > KEPT_REPLY_MAX ? `${t.reply.slice(0, KEPT_REPLY_MAX - 1)}…` : t.reply
-  return { ...t, interim: [], reply, log: t.log.slice(-KEPT_LOG_MAX), pulse: null, expanded: false, diffs: [] }
+  return { ...t, interim: [], reply, log: t.log.slice(-KEPT_LOG_MAX), ranLog: (t.ranLog ?? []).slice(-KEPT_LOG_MAX), pulse: null, diffs: [] }
 }

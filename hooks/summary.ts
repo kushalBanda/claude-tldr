@@ -1,4 +1,5 @@
 // Short words for tool calls: the main screen's one-line group summary and the /tldr expand log. Pure.
+import type { TestRun } from '../types'
 import type { ClassifiedCall } from './classify'
 import { classify, few, shortPath } from './classify'
 
@@ -8,27 +9,36 @@ function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`
 }
 
-function testWords(c: Extract<ClassifiedCall, { kind: 'test' }>): string {
-  const r = c.run
+/** A test run in words: `text` names the runner ("go test ✗ 1 failed"), `result` leaves it out ("✗ 1 failed"). */
+export function testLabel(r: TestRun): { ok: boolean; text: string; result: string } {
   const name = r.runner ?? 'tests'
-  if (r.failed !== null && r.failed > 0) return `${name} ✗ ${r.failed} failed`
-  if (r.passed !== null && !r.isError) return `${name} ✓ ${r.passed} passed`
-  return r.isError ? `${name} ✗ failed` : `${name} ✓ ran`
+  const [ok, result] =
+    r.failed !== null && r.failed > 0 ? [false, `✗ ${r.failed} failed`]
+    : r.passed !== null && !r.isError ? [true, `✓ ${r.passed} passed`]
+    : r.isError ? [false, `✗ ${r.note ?? 'failed'}`]
+    : [true, '✓ ran']
+  return { ok, text: `${name} ${result}`, result }
+}
+
+// An MCP tool reads as its server and tool: mcp__codegraph__codegraph_explore is "codegraph codegraph_explore".
+function toolName(tool: string): string {
+  const m = /^mcp__(.+?)__(.+)$/.exec(tool)
+  return m ? `${m[1]} ${m[2]}` : tool
 }
 
 /** One log line for one finished call. */
 export function logLine(tool: string, calls: ClassifiedCall[], input: unknown): string {
   const c = calls[0]
-  if (c === undefined) return tool
+  if (c === undefined) return toolName(tool)
   if (c.kind === 'read') return `Read ${shortPath(c.path)}`
   if (c.kind === 'search') return `Search ${c.pattern}`
   if (c.kind === 'change' && c.change.viaBash && !c.change.isDelete) return `${tool} wrote ${calls.map(x => (x.kind === 'change' ? shortPath(x.change.path) : '')).join(' ')}`
   if (c.kind === 'change')
     return c.change.isDelete ? `${tool} deleted ${calls.map(x => (x.kind === 'change' ? shortPath(x.change.path) : '')).join(' ')}` : `${tool} ${shortPath(c.change.path)} +${c.change.added} ${MINUS}${c.change.removed}`
-  if (c.kind === 'test') return `Bash ${c.run.command} · ${testWords(c).replace(/^\S+ /, '')}`
+  if (c.kind === 'test') return `Bash ${c.run.command} · ${testLabel(c.run).result}`
   const i = input !== null && typeof input === 'object' ? (input as Record<string, unknown>) : {}
-  const detail = typeof i.command === 'string' ? i.command : typeof i.description === 'string' ? i.description : ''
-  return detail ? `${tool} ${detail.split('\n')[0]!.slice(0, 100)}` : tool
+  const detail = [i.command, i.description, i.url, i.query].find((v): v is string => typeof v === 'string' && v.trim() !== '') ?? ''
+  return detail ? `${toolName(tool)} ${detail.split('\n')[0]!.slice(0, 100)}` : toolName(tool)
 }
 
 export type GroupCall = { tool: string; input: unknown; output?: unknown; isRunning: boolean; isErrored: boolean }
@@ -66,7 +76,7 @@ export function groupSummary(calls: readonly GroupCall[], root?: string): string
       else if (c.kind === 'change') {
         const old = changes.get(c.change.path) ?? { added: 0, removed: 0 }
         changes.set(c.change.path, { added: old.added + c.change.added, removed: old.removed + c.change.removed })
-      } else if (c.kind === 'test') tests.push(testWords(c))
+      } else if (c.kind === 'test') tests.push(testLabel(c.run).text)
       else others++
     }
   }
@@ -75,7 +85,11 @@ export function groupSummary(calls: readonly GroupCall[], root?: string): string
   if (reads.length > 0) parts.push(`Read ${few(unique(reads))}`)
   if (searches.length === 1) parts.push(`Searched ${clip(searches[0]!, SEARCH_MAX)}`)
   else if (searches.length > 1) parts.push(plural(searches.length, 'search', 'searches'))
-  for (const [path, d] of changes) parts.push(`${shortPath(path)} +${d.added} ${MINUS}${d.removed}`)
+  // Two edits name their files; more read as one count, so a refactor stays one line.
+  if (changes.size > 2) {
+    const sum = (k: 'added' | 'removed') => [...changes.values()].reduce((n, d) => n + d[k], 0)
+    parts.push(`edited ${changes.size} files +${sum('added')} ${MINUS}${sum('removed')}`)
+  } else for (const [path, d] of changes) parts.push(`${shortPath(path)} +${d.added} ${MINUS}${d.removed}`)
   if (viaBash.length > 0) parts.push(`wrote ${few(unique(viaBash))}`)
   if (deleted.length > 0) parts.push(`deleted ${few(unique(deleted))}`)
   parts.push(...tests)

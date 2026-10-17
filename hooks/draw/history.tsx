@@ -2,7 +2,8 @@
 import type { EngineInterface, RenderInput } from 'claude-code'
 
 import type { Turn } from '../../types'
-import { duration, lookedLabel, testLabel } from './card'
+import { testLabel } from '../summary'
+import { duration, lookedLabel } from './card'
 import { shortPath } from '../classify'
 import { color, glyph } from './theme'
 

@@ -10,6 +10,7 @@ const group = (ids: string[], isExpanded = false) => ({
   requestId: `group-${ids[0]}`,
   props: { calls: ids.map(id => call(id)), isActive: false, isExpanded },
 })
+const FULL = { columns: 120, rows: 40, isFullscreen: true }
 const RUN = { args: '', origin: { kind: 'composer' as const }, presentation: { isFullscreen: true, columns: 120 } }
 
 function engineRows(on: On) {
@@ -32,7 +33,7 @@ test('the first tool group of a turn draws the card with the turn facts', async 
   await play($)
   const ui = await $.ui.mount({ ...group(CALL_IDS.slice(0, 4)), surface: 'terminal' })
   const text = JSON.stringify(await ui.drawn())
-  for (const s of ['fix the login bug, users get logged out after refresh', 'src/auth.py', '+12', 'src/middleware.py', 'tests/conftest.py', 'pytest ✗ 3 failed', 'pytest ✓ 12 passed', '2 files, 1 search'])
+  for (const s of ['fix the login bug, users get logged out after refresh', '3 files ', '+18', '−6', 'src/auth.py', 'src/middleware.py', 'tests/conftest.py', 'pytest ✗ 3 failed', '"✓ 12 passed"', '2 files, 1 search'])
     expect(text).toContain(s)
   expect(text).not.toContain('engine rows')
 })
@@ -57,14 +58,26 @@ test('ctrl+o (isExpanded) shows the engine rows under the card', async ($, on) =
   expect(text).toContain('engine rows')
 })
 
-test('/tldr expand expands the latest card', async ($, on) => {
+test('/tldr show opens the detail behind a row', async ($, on) => {
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
   engine(on)
   engineRows(on)
   await play($)
-  const r = await $.command.run({ command: 'tldr', ...RUN, args: 'expand' })
-  expect(r.text).toContain('expanded')
-  const ui = await $.ui.mount({ ...group(CALL_IDS.slice(4)), surface: 'terminal' })
-  expect(JSON.stringify(await ui.drawn())).toContain('engine rows')
+  const r = await $.command.run({ command: 'tldr', ...RUN, args: 'show changed' })
+  expect(r.text).toContain('Changed opened')
+  const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-detail', viewport: FULL, props: {} as never })
+  const text = JSON.stringify(await pane.drawn())
+  // Grouped by folder: each folder with its total, each file by name under it.
+  for (const s of ['3 files · +18 −6', '"src/"', '+16 −4', '"  auth.py"', '+12 −3', '"tests/"', '"  conftest.py"']) expect(text).toContain(s)
+  expect((await $.command.run({ command: 'tldr', ...RUN, args: 'show nonsense' })).text).toContain('no row "nonsense"')
+})
+
+test('fullscreen: each card row is one plain press target', async ($, on) => {
+  engine(on)
+  engineRows(on)
+  await play($)
+  const text = JSON.stringify(await (await $.ui.mount({ ...group(CALL_IDS.slice(0, 1)), surface: 'terminal' })).drawn())
+  for (const s of ['tldr-show:all:', 'tldr-show:changed:', 'tldr-show:tests:', 'tldr-show:check:', 'tldr-show:looked:', 'click a row']) expect(text).toContain(s)
 })
 
 test('a subagent tool call is left out of the card', async ($, on) => {

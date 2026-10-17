@@ -59,7 +59,7 @@ test('main screen: the full card takes the place of the closing line', async ($,
     props: { word: 'Baked', durationMs: 52_000 },
   })
   const text = JSON.stringify(await ui.drawn())
-  for (const s of ['fix the login bug', '52s', 'src/auth.py', 'pytest ✓ 12 passed', '/tldr expand']) expect(text).toContain(s)
+  for (const s of ['fix the login bug', '52s', 'src/auth.py', '"✓ 12 passed"', '/tldr show']) expect(text).toContain(s)
   expect(text).not.toContain('Baked for 52s')
 })
 
@@ -74,13 +74,18 @@ test('fullscreen: the closing line is left to the engine', async ($, on) => {
   expect(JSON.stringify(await ui.drawn())).toContain('Baked for 52s')
 })
 
-test('main screen: /tldr expand prints the turn calls', async ($, on) => {
+test('main screen: /tldr show opens the whole turn as steps in order', async ($, on) => {
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
   engine(on)
   engineRows(on)
   await play($)
-  const r = await $.command.run({ command: 'tldr', args: 'expand', ...RUN, presentation: { isFullscreen: false, columns: 120 } })
-  expect(r.text).toContain('TL;DR · fix the login bug')
-  expect(r.text).toContain('⏺ Read src/auth.py')
-  expect(r.text).toContain('⏺ Edit src/auth.py +12 −3')
-  expect(r.text).toContain('⏺ Bash pytest tests/test_auth.py -q · ✗ 3 failed')
+  const r = await $.command.run({ command: 'tldr', args: 'show', ...RUN, presentation: { isFullscreen: false, columns: 120 } })
+  expect(r.text).toContain('the whole turn "fix the login bug')
+  const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-detail', viewport: MAIN, props: {} as never })
+  const text = JSON.stringify(await pane.drawn())
+  for (const s of ['Steps', 'src/middleware.py', 'src/auth.py +12 −3', 'pytest tests/test_auth.py -q ✗ 3 failed', 'tests/conftest.py +2 −2', 'test file', 'Check']) expect(text).toContain(s)
+  // In order: the failing run comes before the test-file edit, which comes before the passing run.
+  const at = (s: string) => text.indexOf(s)
+  expect(at('✗ 3 failed')).toBeLessThan(at('tests/conftest.py +2'))
+  expect(at('tests/conftest.py +2')).toBeLessThan(at('✓ 12 passed'))
 })

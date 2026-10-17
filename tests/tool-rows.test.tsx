@@ -42,7 +42,7 @@ test('fullscreen: the row of the turn first call draws the card', async ($, on) 
   engineRows(on)
   await play($)
   const text = await drawn($, row('tu-1'))
-  for (const s of ['fix the login bug', 'src/auth.py', 'pytest ✓ 12 passed', '/tldr expand']) expect(text).toContain(s)
+  for (const s of ['fix the login bug', 'src/auth.py', '"✓ 12 passed"', 'click a row']) expect(text).toContain(s)
   expect(text).not.toContain('engine row')
 })
 
@@ -64,16 +64,16 @@ test('main screen: each row is one summary line, and its result is folded', asyn
   expect(await drawn($, result('tu-5', MAIN))).not.toContain('engine result')
 })
 
-test('/tldr expand brings the rows and results back, with the card on the first row', async ($, on) => {
+test('/tldr show tests lists each run with its result', async ($, on) => {
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
   engine(on)
   engineRows(on)
   await play($)
-  await $.command.run({ command: 'tldr', ...RUN })
-  const first = await drawn($, row('tu-1'))
-  expect(first).toContain('fix the login bug')
-  expect(first).toContain('engine row tu-1')
-  expect(await drawn($, row('tu-5'))).toContain('engine row tu-5')
-  expect(await drawn($, result('tu-5'))).toContain('engine result')
+  await $.command.run({ command: 'tldr', ...RUN, args: 'show tests' })
+  const text = await drawn($, { plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-detail', viewport: FULL, props: {} as never })
+  for (const s of ['pytest tests/test_auth.py -q', '3 failed', '12 passed']) expect(text).toContain(s)
+  // The card stays the TL;DR: rows stay folded.
+  expect(await drawn($, row('tu-5'))).not.toContain('engine row tu-5')
 })
 
 test('a row that belongs to no turn, and a desktop row, stay the engine own', async ($, on) => {
@@ -116,7 +116,7 @@ test('card: a file outside the project shows its short path, in the row and in t
   await $.tool.call({ tool: 'Edit', file_path: '/private/tmp/x/tldr-demo/auth.ts', old_string: 'a', new_string: 'b', tool_use_id: 'o-1' } as never)
   await $.turn.complete({ turnId: 'o', answer: 'done' } as never)
   const text = await drawn($, row('o-1'))
-  expect(text).toContain('"…/tldr-demo/auth.ts "')
+  expect(text).toContain('"…/tldr-demo/auth.ts"')
   expect(text).toContain('wrote outside the project: …/tldr-demo/auth.ts')
   expect(text).not.toContain('/private/tmp/x')
 })

@@ -11,6 +11,7 @@ const MAIN = { columns: 120, rows: 40, isFullscreen: false }
 const RUN = { origin: { kind: 'composer' as const }, presentation: { isFullscreen: true, columns: 120 } }
 
 function engine(on: On) {
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
   mock.clock(on)
   on('turn.start', async (_$, e) => ({ turnId: e.turnId }))
   on('tool.call', async () => ({ result: {} }) as never)
@@ -80,19 +81,12 @@ test('main screen: in-between text stays as printed', async ($, on) => {
   expect(JSON.stringify(await ui.drawn())).toContain(`engine: ${NOTE}`)
 })
 
-test('/tldr expand brings the in-between text back, in the card and in place', async ($, on) => {
+test('/tldr show notes brings the in-between text back', async ($, on) => {
   engine(on)
   await turnWithNote($)
-  await $.command.run({ command: 'tldr', args: 'expand', ...RUN })
-  const msg = await $.ui.mount(message(NOTE))
-  expect(JSON.stringify(await msg.drawn())).toContain(`engine: ${NOTE}`)
-  const card = await $.ui.mount({
-    plugin: 'tldr', surface: 'terminal', component: 'ToolGroup', requestId: 'g', viewport: FULL,
-    props: { calls: [{ tool_use_id: 'r1', tool: 'Read', input: {}, isRunning: false, isErrored: false, isInterrupted: false }], isActive: false, isExpanded: false },
-  })
-  const text = JSON.stringify(await card.drawn())
-  expect(text).toContain('Notes')
-  expect(text).toContain(NOTE)
+  await $.command.run({ command: 'tldr', args: 'show notes', ...RUN })
+  const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-detail', viewport: FULL, props: {} as never })
+  expect(JSON.stringify(await pane.drawn())).toContain(NOTE)
 })
 
 test('a subagent response is left out', async ($, on) => {

@@ -21,13 +21,12 @@ function host(on: On, stored: Record<string, unknown> = {}) {
 }
 
 test('toKept drops folded text and live state, caps the reply and the log', async () => {
-  const t = { ...startTurn('t', 'go', 0), interim: ['note'], reply: 'x'.repeat(3000), log: Array.from({ length: 100 }, (_, i) => `line ${i}`), expanded: true, pulse: { kind: 'change' as const, key: 'a', at: 1 } }
+  const t = { ...startTurn('t', 'go', 0), interim: ['note'], reply: 'x'.repeat(3000), log: Array.from({ length: 100 }, (_, i) => `line ${i}`), pulse: { kind: 'change' as const, key: 'a', at: 1 } }
   const k = toKept(t)
   expect(k.interim).toEqual([])
   expect(k.reply?.length).toBe(2000)
   expect(k.log.length).toBe(40)
   expect(k.log.at(-1)).toBe('line 99')
-  expect(k.expanded).toBe(false)
   expect(k.pulse).toBeNull()
 })
 

@@ -18,6 +18,7 @@ export type TestRun = {
   failed: number | null
   skipped: number | null
   isError: boolean
+  note?: string // what failed when no test ran: "build failed"
 }
 
 export type Turn = {
@@ -30,11 +31,11 @@ export type Turn = {
   changes: Change[]
   testRuns: TestRun[]
   toolUseIds: string[]
-  log: string[] // one line per tool call, for /tldr expand on the main screen
+  log: string[] // one line per tool call, in order: the steps view and the main-screen lines
+  ranLog?: string[] // the log line of each call counted under Ran, for the detail pane
   ran?: string[] // a short name per call that is not a read, search, change or test: git, gh, WebFetch
   interim: string[] // what Claude wrote between tool calls; folded into the card
   reply: string | null // what Claude wrote after its last tool call
-  expanded: boolean
   pulse: Pulse | null // the newest change or test result, for a short highlight
   flags: Flag[] // what to check before trusting this turn
   diffs: FileDiff[] // the turn's edits as diff lines, for /tldr diff (dropped on disk)
@@ -44,7 +45,7 @@ export type Turn = {
 export type FileDiff = { path: string; lines: string[] }
 
 export type FlagKind = 'tests-edited' | 'outside-root' | 'deleted' | 'skipped-tests' | 'bypass'
-export type Flag = { kind: FlagKind; detail: string; items?: string[] } // detail fits one row; items show when expanded
+export type Flag = { kind: FlagKind; detail: string; items?: string[] } // detail fits one row; items show in the Check pane
 
 export type Pulse = { kind: 'change' | 'test'; key: string; at: number }
 

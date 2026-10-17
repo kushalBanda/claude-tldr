@@ -119,13 +119,23 @@ function baseName(path: string): string {
 }
 
 const CD_CMD = /^\s*cd(?:\s+(\S+))?\s*$/
+// `S=/tmp/x.sh` or `export OUT=dist/a.json` on its own: later parts can name the path through `$S`.
+const ASSIGN = /^\s*(?:export\s+)?([A-Za-z_]\w*)=(\S*)\s*$/
+
+type Vars = ReadonlyMap<string, string>
+
+/** `$NAME` and `${NAME}` replaced from what the same command set; a variable it did not set stays as it is. */
+function expand(path: string, vars: Vars): string {
+  return path.replace(/\$\{?([A-Za-z_]\w*)\}?/g, (all, name: string) => vars.get(name) ?? all)
+}
 
 /**
  * The command's parts in order (split at && ; || | and newlines, but not the `>|` redirect), each with the
  * folder a `cd` before it moved to. `dir` is null after a `cd` the text cannot follow.
  */
-function partsOf(w: Words): { part: string; dir: string | null }[] {
-  const out: { part: string; dir: string | null }[] = []
+function partsOf(w: Words): { part: string; dir: string | null; vars: Vars }[] {
+  const out: { part: string; dir: string | null; vars: Vars }[] = []
+  const vars = new Map<string, string>()
   let dir: string | null = ''
   for (const part of w.text.split(/\s*(?:&&|;|\|\||(?<!>)\||\n)\s*/)) {
     const cd = CD_CMD.exec(part)
@@ -134,12 +144,20 @@ function partsOf(w: Words): { part: string; dir: string | null }[] {
       dir = dir === null || !named(to) || to === '-' || to === '~' ? null : joinPath(dir, to)
       continue
     }
-    out.push({ part, dir })
+    const set = ASSIGN.exec(part)
+    if (set) {
+      const value = expand(unquote(set[2]!, w), vars)
+      if (named(value)) vars.set(set[1]!, value)
+      else vars.delete(set[1]!)
+      continue
+    }
+    out.push({ part, dir, vars: new Map(vars) })
   }
   return out
 }
 
-function place(path: string, dir: string | null): string | null {
+function place(raw: string, dir: string | null, vars: Vars): string | null {
+  const path = expand(raw, vars)
   if (!named(path)) return null
   if (dir === null) return path.startsWith('/') || path.startsWith('~') ? path : null
   return joinPath(dir, path)
@@ -151,7 +169,7 @@ const RM_CMD = /^\s*(?:sudo\s+)?(?:git\s+)?rm\s+(.+)$/
 export function rmTargets(command: string): string[] {
   const w = shellWords(command)
   const out: string[] = []
-  for (const { part, dir } of partsOf(w)) {
+  for (const { part, dir, vars } of partsOf(w)) {
     const m = RM_CMD.exec(part)
     if (!m) continue
     let flags = true
@@ -159,7 +177,7 @@ export function rmTargets(command: string): string[] {
       if (word === '') continue
       if (flags && word === '--') { flags = false; continue }
       if (flags && word.startsWith('-')) continue
-      const path = place(unquote(word, w), dir)
+      const path = place(unquote(word, w), dir, vars)
       if (path !== null) out.push(path)
     }
   }
@@ -192,28 +210,28 @@ function restorePaths(args: string): string[] {
 export function bashWrites(command: string): string[] {
   const w = shellWords(command)
   const out = new Set<string>()
-  const add = (word: string, dir: string | null) => {
-    const path = place(unquote(word, w), dir)
+  const add = (word: string, dir: string | null, vars: Vars) => {
+    const path = place(unquote(word, w), dir, vars)
     if (path !== null && !path.startsWith('/dev/')) out.add(path)
   }
-  for (const { part, dir } of partsOf(w)) {
-    for (const m of part.matchAll(REDIRECT)) if (!m[1]!.startsWith('&')) add(m[1]!, dir)
+  for (const { part, dir, vars } of partsOf(w)) {
+    for (const m of part.matchAll(REDIRECT)) if (!m[1]!.startsWith('&')) add(m[1]!, dir, vars)
     const bare = part.replace(/\s*\d?>>?.*$/, '') // the command without its redirects
     const tee = TEE_CMD.exec(bare)
-    if (tee) for (const word of tee[1]!.split(/\s+/)) if (word !== '' && !word.startsWith('-')) add(word, dir)
+    if (tee) for (const word of tee[1]!.split(/\s+/)) if (word !== '' && !word.startsWith('-')) add(word, dir, vars)
     const back = CHECKOUT_CMD.exec(part)?.[1] ?? RESTORE_CMD.exec(part)?.[1]
-    if (back !== undefined) for (const word of restorePaths(back)) add(word, dir)
+    if (back !== undefined) for (const word of restorePaths(back)) add(word, dir, vars)
     const last = LAST_ARG_CMD.exec(bare)
     if (last) {
       const args = last[1]!.trim().split(/\s+/).filter(x => x !== '' && !x.startsWith('-')).map(x => unquote(x, w)).filter(x => x !== '')
       const target = args.at(-1)
       if (target === undefined) continue
-      if (!/^\s*(?:sudo\s+)?(?:cp|mv|install)\b/.test(part)) { add(target, dir); continue }
+      if (!/^\s*(?:sudo\s+)?(?:cp|mv|install)\b/.test(part)) { add(target, dir, vars); continue }
       // A source, then the target. More than one source, or a target ending in `/`, means a folder.
       const sources = args.slice(0, -1)
       if (sources.length === 0) continue
-      if (sources.length > 1 || target.endsWith('/')) for (const s of sources) add(joinPath(target, baseName(s)), dir)
-      else add(target, dir)
+      if (sources.length > 1 || target.endsWith('/')) for (const s of sources) add(joinPath(target, baseName(s)), dir, vars)
+      else add(target, dir, vars)
     }
   }
   return [...out]

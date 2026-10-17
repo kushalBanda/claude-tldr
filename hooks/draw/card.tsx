@@ -1,9 +1,11 @@
 // The turn card: goal, what changed, tests, what Claude looked at.
 import type { EngineInterface, RenderChildren, RenderInput, UiPressArgument } from 'claude-code'
 
-import type { TestRun, Turn } from '../../types'
+import type { Change, Turn } from '../../types'
 import { shortPath } from '../classify'
-import { ranLabel } from '../summary'
+import { changeTotals } from '../steps'
+import { ranLabel, testLabel } from '../summary'
+import type { Section } from './detail'
 import { color, glyph, LABEL_WIDTH } from './theme'
 
 function clock(ms: number): string {
@@ -18,13 +20,6 @@ export function duration(ms: number): string {
   return `${m}m ${s % 60}s`
 }
 
-export function testLabel(r: TestRun): { ok: boolean; text: string } {
-  const name = r.runner ?? 'tests'
-  if (r.failed !== null && r.failed > 0) return { ok: false, text: `${name} ${glyph.fail} ${r.failed} failed` }
-  if (r.passed !== null && !r.isError) return { ok: true, text: `${name} ${glyph.pass} ${r.passed} passed` }
-  return r.isError ? { ok: false, text: `${name} ${glyph.fail} failed` } : { ok: true, text: `${name} ${glyph.pass} ran` }
-}
-
 export function lookedLabel(t: Turn): string {
   const parts: string[] = []
   if (t.reads.length > 0) parts.push(`${t.reads.length} file${t.reads.length === 1 ? '' : 's'}`)
@@ -33,9 +28,8 @@ export function lookedLabel(t: Turn): string {
 }
 
 export type CardOptions = {
+  /** ctrl+o on a fullscreen group: the engine's rows sit under the card, and the card adds Claude's notes. */
   isExpanded: boolean
-  /** How the person expands it here: ctrl+o where rows redraw (fullscreen), /tldr expand on the main screen. */
-  expandBy: 'ctrl+o' | '/tldr'
   /** The engine's own measure of the turn, where it gives one (TurnDuration). */
   durationMs?: number
   /** Clock time now, and whether the newest change or test result may flash. */
@@ -43,11 +37,14 @@ export type CardOptions = {
   pulse?: boolean
   /** The action buttons, where presses reach the mod (fullscreen) and the turn is done. */
   actions?: CardActions
+  /** Opens the detail pane behind a row, where presses reach the mod (fullscreen). The goal opens the steps. Absent: rows are plain text. */
+  show?: (s: Section | 'all') => void
 }
 
 export type CardActions = { copy: (p: UiPressArgument) => void; diff: (p: UiPressArgument) => void }
 
 export const PULSE_MS = 900
+const NAMES_SHOWN = 3 // file names on the Changed row; the pane lists all
 
 export function drawCard($: EngineInterface, e: RenderInput<'ToolGroup'> | RenderInput<'ToolUse'> | RenderInput<'TurnDuration'>, t: Turn, o: CardOptions) {
   const { Box, Button, Text } = $.ui.resolve(e)
@@ -56,9 +53,15 @@ export function drawCard($: EngineInterface, e: RenderInput<'ToolGroup'> | Rende
   const isExpanded = o.isExpanded
   const flash = (kind: 'change' | 'test', key: string) =>
     o.pulse === true && o.now !== undefined && t.pulse !== null && t.pulse.kind === kind && t.pulse.key === key && o.now - t.pulse.at < PULSE_MS
-  const hint = o.expandBy === 'ctrl+o'
-    ? (isExpanded ? `ctrl+o collapse ${glyph.collapse}` : `ctrl+o expand ${glyph.expand}`)
-    : '/tldr expand'
+  // The card is the TL;DR; the detail sits one press away (a click in fullscreen, /tldr show on the main screen).
+  const hint = o.show !== undefined ? `click a row ${glyph.expand}` : '/tldr show'
+  // A row's value as one press target: the whole value opens its detail, nothing about it changes but the cursor.
+  const pressable = (s: Section, children: RenderChildren, n = 0) =>
+    o.show !== undefined ? (
+      <Button key={`tldr-show:${s}:${t.id}:${n}`} plain onPress={() => o.show!(s)}>{children}</Button>
+    ) : (
+      <Text>{children}</Text>
+    )
 
   const row = (label: string, value: RenderChildren, labelColor: string = color.label) => (
     <Box flexDirection="row">
@@ -71,41 +74,55 @@ export function drawCard($: EngineInterface, e: RenderInput<'ToolGroup'> | Rende
     </Box>
   )
 
+  // One file reads as itself. Several read as their size first, then the first names; the pane has each one.
+  const total = changeTotals(t.changes)
+  const name = (c: Change) =>
+    c.isDelete ? (
+      <Text color={color.check}>{`${shortPath(c.path)} deleted`}</Text>
+    ) : (
+      <Text bold={flash('change', c.path)} backgroundColor={flash('change', c.path) ? (c.isTest ? color.check : color.pass) : undefined}>{shortPath(c.path)}</Text>
+    )
+  const counts = (added: number, removed: number) => (
+    <Text><Text color={color.added}>{`+${added}`}</Text>{' '}<Text color={color.removed}>{`${glyph.minus}${removed}`}</Text></Text>
+  )
+  const one = (c: Change) =>
+    c.isDelete ? name(c) : <Text>{name(c)}{' '}{c.viaBash ? <Text color={color.dim}>via Bash</Text> : counts(c.added, c.removed)}</Text>
   const changed =
     t.changes.length === 0 ? (
-      <Text color={color.dim}>no files</Text>
+      pressable('changed', <Text color={color.dim}>no files</Text>)
+    ) : t.changes.length === 1 ? (
+      pressable('changed', one(t.changes[0]!))
     ) : (
-      t.changes.map(c => c.isDelete ? (
-        <Text color={color.check}>{`${shortPath(c.path)} deleted`}</Text>
-      ) : c.viaBash ? (
-        <Text bold={flash('change', c.path)}>{`${shortPath(c.path)} `}<Text color={color.dim}>via Bash</Text></Text>
-      ) : (
-        <Text bold={flash('change', c.path)} backgroundColor={flash('change', c.path) ? (c.isTest ? color.check : color.pass) : undefined}>
-          {`${shortPath(c.path)} `}<Text color={color.added}>{`+${c.added}`}</Text>{' '}<Text color={color.removed}>{`${glyph.minus}${c.removed}`}</Text>
-        </Text>
-      ))
+      pressable('changed', [
+        <Text>{`${total.files} files `}{total.counted ? counts(total.added, total.removed) : <Text color={color.dim}>via Bash</Text>}</Text>,
+        '   ',
+        ...t.changes.slice(0, NAMES_SHOWN).flatMap((c, i) => [i > 0 ? <Text color={color.dim}>, </Text> : '', name(c)]),
+        t.changes.length > NAMES_SHOWN ? <Text color={color.dim}>{` +${t.changes.length - NAMES_SHOWN} more`}</Text> : '',
+      ])
     )
 
   const tests =
     t.testRuns.length === 0 ? (
-      <Text color={color.dim}>not run</Text>
+      pressable('tests', <Text color={color.dim}>not run</Text>)
     ) : (
-      <Text>
-        {t.testRuns.map((r, i) => {
+      pressable('tests',
+        t.testRuns.map((r, i) => {
           const l = testLabel(r)
+          // One runner names itself once: "go test ✗ 1 failed → ✓ 11 passed".
+          const same = i > 0 && t.testRuns[i - 1]!.runner === r.runner
           return (
             <Text>
               {i > 0 ? <Text color={color.dim}>{`  ${glyph.arrow}  `}</Text> : ''}
-              <Text color={l.ok ? color.pass : color.fail} bold={flash('test', String(i))}>{l.text}</Text>
+              <Text color={l.ok ? color.pass : color.fail} bold={flash('test', String(i))}>{same ? l.result : l.text}</Text>
             </Text>
           )
-        })}
-      </Text>
+        }),
+      )
     )
 
   const looked = (
     <Box flexDirection="row" justifyContent="space-between" flexGrow={1}>
-      <Text>{lookedLabel(t)}</Text>
+      {pressable('looked', lookedLabel(t))}
       <Text color={color.dim}>{hint}</Text>
     </Box>
   )
@@ -113,7 +130,11 @@ export function drawCard($: EngineInterface, e: RenderInput<'ToolGroup'> | Rende
   return (
     <Box key="tldr-card" flexDirection="column" borderStyle="round" borderColor={t.flags.length > 0 ? color.check : color.border} paddingX={1}>
       <Box flexDirection="row" justifyContent="space-between" columnGap={2}>
-        <Text bold wrap="truncate-end">{t.goal}</Text>
+        {o.show !== undefined ? (
+          <Button key={`tldr-show:all:${t.id}`} plain onPress={() => o.show!('all')}><Text bold wrap="truncate-end">{t.goal}</Text></Button>
+        ) : (
+          <Text bold wrap="truncate-end">{t.goal}</Text>
+        )}
         <Text color={color.dim}>{meta}</Text>
       </Box>
       {row('Changed', changed)}
@@ -122,17 +143,12 @@ export function drawCard($: EngineInterface, e: RenderInput<'ToolGroup'> | Rende
         ? row(
             'Check',
             <Box flexDirection="column" flexGrow={1}>
-              {t.flags.map(fl => (
-                <Box flexDirection="column">
-                  <Text color={color.check} wrap="truncate-end">{`⚠ ${fl.detail}`}</Text>
-                  {isExpanded ? (fl.items ?? []).map(i => <Text color={color.dim} wrap="truncate-end">{`  ${i}`}</Text>) : null}
-                </Box>
-              ))}
+              {t.flags.map((fl, i) => pressable('check', <Text color={color.check} wrap="truncate-end">{`⚠ ${fl.detail}`}</Text>, i))}
             </Box>,
             color.check,
           )
         : null}
-      {(t.ran ?? []).length > 0 ? row('Ran', <Text>{ranLabel(t.ran ?? [])}</Text>) : null}
+      {(t.ran ?? []).length > 0 ? row('Ran', pressable('ran', ranLabel(t.ran ?? []))) : null}
       {row('Looked at', looked)}
       {isExpanded && t.interim.length > 0
         ? row(

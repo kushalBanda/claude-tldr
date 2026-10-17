@@ -10,18 +10,20 @@ import { unifiedDiff } from './netdiff'
 import { drawCard, PULSE_MS } from './draw/card'
 import { BAND_KEY, bandColumns, bandLabel, bandState, drawBand, keptNote } from './draw/band'
 import { drawCompactLine } from './draw/compact-line'
+import { DETAIL_PANE, drawDetail, paneRows, paneTitle, sectionOf } from './draw/detail'
+import type { Section } from './draw/detail'
 import { DIFF_PANE, drawDiff } from './draw/diff'
 import { drawHistory, HISTORY_PANE } from './draw/history'
 import { drawSpinner, SPINNER_KEY } from './draw/spinner'
 import { readFeatures } from './features'
 import { bandFrame, encodeCells, spinnerFrame } from './motion'
 import type { SpinnerMode } from './motion'
-import { allTurns, closeCurrent, latestTurn, loadKept, openTurn, readKept, readLive, saveKept, setKept, setLive, turnForCalls, updateCurrent, updateTurn } from './state'
+import { allTurns, closeCurrent, durationTurn, latestTurn, loadKept, openTurn, readKept, readLive, saveKept, setKept, setLive, turnForCalls, updateCurrent, updateTurn } from './state'
 import { activityWord, logLine, runName } from './summary'
 import { checkTurn } from './trust'
 import { endTurn, isInterim, recordCall, recordStep, startTurn, toKept } from './turn'
 
-const HELP = 'TL;DR is on. /tldr expand · /tldr collapse (or ctrl+o) · /tldr history · /tldr copy · /tldr diff'
+const HELP = 'TL;DR is on. Click a card row for its detail, or /tldr show [changed|tests|check|ran|looked] · /tldr history · /tldr copy · /tldr diff'
 
 // The frame loop repaints the spinner and the band between renders (module state: a reload restarts it).
 const FRAME_MS = 80
@@ -31,6 +33,8 @@ let spinnerSite: { requestId: string; mode: SpinnerMode } | null = null
 let bandSite: { requestId: string; columns: number; live: Live } | null = null
 // The turn the diff pane shows: the card whose diff button was pressed last.
 let diffFor: string | null = null
+// What the detail pane shows: the turn and the row pressed last (or /tldr show).
+let detailFor: { turnId: string; section: Section | 'all' } | null = null
 // Each edited file's text before the open turn's first edit of it, for the turn's net diff (null: too large).
 let openTurnId: string | null = null
 let befores = new Map<string, string | null>()
@@ -66,7 +70,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const r = await next(e)
     await $.command
-      .register({ name: 'tldr', description: 'TL;DR for Claude Code: turn cards', argumentHint: '[expand|collapse|history|copy|diff]' })
+      .register({ name: 'tldr', description: 'TL;DR for Claude Code: turn cards', argumentHint: '[show|history|copy|diff]' })
       .catch(() => {})
     // A resumed session: its earlier cards are on disk, its earlier rows are not on screen.
     if (f.keep) {
@@ -169,10 +173,22 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'tldr' }, async ($, e) => {
     const sub = e.args.trim().toLowerCase()
-    const isFullscreen = e.presentation.isFullscreen
     if (!f.card) return { text: 'TL;DR: the turn card is off. Turn it on in /plugin, TL;DR options.' }
-    if (sub === 'expand') return setExpanded($, true, isFullscreen)
-    if (sub === 'collapse') return setExpanded($, false, isFullscreen)
+    // One card, one detail: `show` opens what sits behind a row. `expand` is kept as a word for it.
+    const [verb = '', arg = ''] = sub.split(/\s+/)
+    if (verb === 'show' || verb === 'expand') {
+      const section = sectionOf(arg)
+      if (section === null) return { text: `TL;DR: no row "${arg}". Rows: changed, tests, check, ran, looked.` }
+      const t = await lastTurn($, f.keep)
+      if (t === null) return { text: 'TL;DR: no turn yet.' }
+      await showDetail($, t, section)
+      const what = section === 'all' ? `the whole turn "${t.goal}"` : paneTitle(t, section).replace(/^TL;DR · /, '')
+      return { text: `TL;DR: ${what} opened. Escape closes it.` }
+    }
+    if (verb === 'collapse' || verb === 'hide') {
+      await $.ui.close({ id: DETAIL_PANE }).catch(() => {})
+      return { text: 'TL;DR: detail closed.' }
+    }
     if (sub === 'history' && !f.keep) return { text: 'TL;DR: keeping cards is off. Turn it on in /plugin, TL;DR options.' }
     if (sub === 'history') {
       const n = (await loadKept($).catch(() => [])).length
@@ -197,14 +213,14 @@ export const register: Register = (on, options) => {
     if (found === null) return next(e)
     // Main screen: printed rows cannot change, so each group is one line; the card follows at turn end.
     if (e.viewport?.isFullscreen === false) return e.props.isExpanded ? next(e) : drawCompactLine($, e, e.props.calls, await $.session.root().catch(() => undefined))
-    const expanded = e.props.isExpanded || found.turn.expanded
+    const expanded = e.props.isExpanded
     const { Box } = $.ui.resolve(e)
     if (!found.isFirst) return expanded ? next(e) : <Box key="tldr-folded" />
     const t = found.turn
     const actions = f.actions && t.endedAt !== null
       ? { copy: (p: { surface: RenderSurface }) => void copyReply($, t, p.surface, true), diff: () => void openDiff($, t) }
       : undefined
-    const card = drawCard($, e, t, { isExpanded: expanded, expandBy: 'ctrl+o', now: await $.clock.now(), pulse: f.motion && f.animation, actions })
+    const card = drawCard($, e, t, { isExpanded: expanded, now: await $.clock.now(), pulse: f.motion && f.animation, actions, show: sec => void showDetail($, t, sec) })
     if (!expanded) return card
     const rows = await next(e)
     return (
@@ -221,29 +237,21 @@ export const register: Register = (on, options) => {
     const found = turnForCalls(await allTurns($), [e.props.tool_use_id])
     if (found === null) return next(e)
     const t = found.turn
-    if (e.viewport?.isFullscreen === false) return t.expanded ? next(e) : drawCompactLine($, e, [e.props], await $.session.root().catch(() => undefined))
+    if (e.viewport?.isFullscreen === false) return drawCompactLine($, e, [e.props], await $.session.root().catch(() => undefined))
     const { Box } = $.ui.resolve(e)
-    if (!found.isFirst) return t.expanded ? next(e) : <Box key="tldr-folded" />
+    if (!found.isFirst) return <Box key="tldr-folded" />
     const actions = f.actions && t.endedAt !== null
       ? { copy: (p: { surface: RenderSurface }) => void copyReply($, t, p.surface, true), diff: () => void openDiff($, t) }
       : undefined
-    // ctrl+o expands groups only; a standalone row opens with /tldr expand.
-    const card = drawCard($, e, t, { isExpanded: t.expanded, expandBy: '/tldr', now: await $.clock.now(), pulse: f.motion && f.animation, actions })
-    if (!t.expanded) return card
-    const row = await next(e)
-    return (
-      <Box key="tldr-expanded" flexDirection="column">
-        {card}
-        {row}
-      </Box>
-    )
+    // A standalone row has no ctrl+o of its own: the card stands for it, and a press opens the detail.
+    return drawCard($, e, t, { isExpanded: false, now: await $.clock.now(), pulse: f.motion && f.animation, actions, show: sec => void showDetail($, t, sec) })
   })
 
   // The result block under a standalone row: folded with its row.
   on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
     if (!f.card || e.surface !== 'terminal') return next(e)
     const found = turnForCalls(await allTurns($), [e.props.tool_use_id])
-    if (found === null || found.turn.expanded) return next(e)
+    if (found === null) return next(e)
     const { Box } = $.ui.resolve(e)
     return <Box key="tldr-folded-result" />
   })
@@ -253,7 +261,7 @@ export const register: Register = (on, options) => {
     if (!f.card || e.surface !== 'terminal' || e.viewport?.isFullscreen === false) return next(e)
     const list = await allTurns($)
     const owner = list.slice(-50).find(t => isInterim(t, e.props.text))
-    if (owner === undefined || owner.expanded) return next(e)
+    if (owner === undefined) return next(e)
     const { Box } = $.ui.resolve(e)
     return <Box key="tldr-folded-text" />
   })
@@ -306,28 +314,21 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: HISTORY_PANE }, async ($, e) => drawHistory($, e, await loadKept($).catch(() => [])))
 
+  on('ui.render', { component: 'Pane', requestId: DETAIL_PANE }, async ($, e) => {
+    const all = [...(await allTurns($)), ...(f.keep ? await loadKept($).catch(() => []) : [])]
+    return drawDetail($, e, detailFor === null ? null : all.find(t => t.id === detailFor!.turnId) ?? null, detailFor?.section ?? 'all')
+  })
+
   on('ui.render', { component: 'Pane', requestId: DIFF_PANE }, async ($, e) => drawDiff($, e, (await allTurns($)).find(t => t.id === diffFor) ?? null))
 
   // Main screen: the full card takes the place of the turn's closing line ("Baked for 52s").
   on('ui.render', { component: 'TurnDuration' }, async ($, e, next) => {
     if (!f.card || e.surface !== 'terminal' || e.viewport?.isFullscreen !== false) return next(e)
-    const t = await latestTurn($)
-    if (t === null || t.toolUseIds.length === 0) return next(e)
-    return drawCard($, e, t, { isExpanded: false, expandBy: '/tldr', durationMs: e.props.durationMs })
+    const t = await durationTurn($, e.requestId, e.props.durationMs)
+    if (t === null) return next(e)
+    return drawCard($, e, t, { isExpanded: false, durationMs: e.props.durationMs })
   })
 
-}
-
-async function setExpanded($: EngineInterface, expanded: boolean, isFullscreen: boolean) {
-  const t = await latestTurn($)
-  if (t === null) return { text: 'TL;DR: no turn yet.' }
-  // The main screen cannot redraw printed rows, so expand prints the turn's calls instead.
-  if (!isFullscreen) {
-    if (!expanded) return { text: 'TL;DR: on the main screen, cards stay as printed.' }
-    return { text: [`TL;DR · ${t.goal}`, ...t.log.map(l => `⏺ ${l}`)].join('\n') }
-  }
-  await updateTurn($, t.id, x => ({ ...x, expanded }))
-  return { text: expanded ? `TL;DR: expanded "${t.goal}".` : `TL;DR: collapsed "${t.goal}".` }
 }
 
 /** The newest turn in this session; after a resume, the newest kept card. */
@@ -347,6 +348,13 @@ async function copyText($: EngineInterface, text: string, what: string, surface:
 async function copyReply($: EngineInterface, t: Turn, surface?: RenderSurface, toast = false): Promise<string> {
   if (t.reply === null) return `TL;DR: "${t.goal}" has no reply to copy.`
   return copyText($, cleanCopy(t.reply), 'reply', surface, toast)
+}
+
+/** Opens the detail pane behind a card row: small, holding the keys, closed by Escape. */
+async function showDetail($: EngineInterface, t: Turn, section: Section | 'all') {
+  detailFor = { turnId: t.id, section }
+  await $.ui.open({ id: DETAIL_PANE, title: paneTitle(t, section), focus: true, closeOnEscape: true, rows: paneRows(t, section) })
+  $.ui.invalidate('ui.render')
 }
 
 async function openDiff($: EngineInterface, t: Turn) {

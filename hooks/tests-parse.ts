@@ -1,6 +1,7 @@
 // Recognize test commands and read their result counts. Pure.
 
-export type TestCounts = { passed: number | null; failed: number | null; skipped: number | null }
+// note: what failed when no test ran at all, as "build failed".
+export type TestCounts = { passed: number | null; failed: number | null; skipped: number | null; note?: string }
 
 // Command start: line start or after a shell separator, with an optional runner prefix (npx, pnpm exec, ...).
 const AT = String.raw`(^|[\s;&|(])`
@@ -84,12 +85,13 @@ function cargo(output: string): TestCounts {
 }
 
 // "--- PASS: TestX" lines come with -v; without them only the package lines show, and there are no counts.
+// Top-level tests only: an indented line is a subtest, and its parent already passes or fails with it.
 function go(output: string): TestCounts {
   const n = (re: RegExp) => output.split('\n').filter(l => re.test(l)).length
-  const passed = n(/^\s*--- PASS: /)
-  const failed = n(/^\s*--- FAIL: /)
-  if (passed + failed === 0) return NONE
-  return { passed, failed, skipped: n(/^\s*--- SKIP: /) }
+  const passed = n(/^--- PASS: /)
+  const failed = n(/^--- FAIL: /)
+  if (passed + failed === 0) return /\[(build|setup) failed\]/.test(output) ? { ...NONE, note: 'build failed' } : NONE
+  return { passed, failed, skipped: n(/^--- SKIP: /) }
 }
 
 // " 12 pass" / " 3 fail" / " 1 skip" lines at the end of a bun test run.
@@ -137,12 +139,12 @@ export function parseResult(runner: string | null, output: string): TestCounts {
   const own = runner === null ? undefined : PARSERS[runner]
   if (own !== undefined) {
     const r = own(output)
-    if (r.passed !== null || r.failed !== null) return r
+    if (r.passed !== null || r.failed !== null || r.note !== undefined) return r
   }
   // A package script or task runner (npm test, make test, tox, ...) runs some runner: the first summary any of them finds.
   for (const parse of [jest, vitest, bun, pytest, unittest, deno, cargo, go, playwright]) {
     const r = parse(output)
-    if (r.passed !== null || r.failed !== null) return r
+    if (r.passed !== null || r.failed !== null || r.note !== undefined) return r
   }
   return NONE
 }

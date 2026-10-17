@@ -1,11 +1,14 @@
 import { expect, test } from 'claude-code/testing'
 
-import type { Turn } from '../types'
+import type { Change, TestRun, Turn } from '../types'
+import { byFolder, changeTotals, stepsOf, stepVerb } from '../hooks/steps'
 import { bashWrites, classify, rmTargets } from '../hooks/classify'
 import { detectRunner, parseResult } from '../hooks/tests-parse'
 import { checkTurn } from '../hooks/trust'
 import { goalOf } from '../hooks/turn'
-import { groupSummary } from '../hooks/summary'
+import { paneRows } from '../hooks/draw/detail'
+import { turnForDuration } from '../hooks/state'
+import { groupSummary, logLine } from '../hooks/summary'
 
 // Edge cases from the 2026-10-17 probe. See docs/ADRs/0009-read-bash-statically.md.
 
@@ -164,4 +167,95 @@ test('summary: a line names what was read, searched and written', async () => {
   expect(groupSummary(['a', 'b', 'c', 'a'].map(n => call('Read', { file_path: `src/${n}.ts` })))).toEqual(['Read src/a.ts, src/b.ts +1 more'])
   expect(groupSummary([call('Grep', { pattern: 'decodeToken' }), call('Grep', { pattern: 'x' })])).toEqual(['2 searches'])
   expect(groupSummary([call('Bash', { command: 'echo a > out/a.txt && echo b > out/b.txt && echo c > out/c.txt' })])).toEqual(['wrote out/a.txt, out/b.txt +1 more'])
+})
+
+test('bash writes: a variable the same command set names the path', async () => {
+  expect(bashWrites(`S=/tmp/run/notify.sh; cat > "$S" <<'EOF'\necho hi\nEOF\nchmod +x "$S"`)).toEqual(['/tmp/run/notify.sh'])
+  expect(bashWrites('export OUT=dist && echo x > ${OUT}/a.json')).toEqual(['dist/a.json'])
+  expect(bashWrites('echo x > "$UNSET/a.json"')).toEqual([])
+  expect(rmTargets('F=old.txt; rm "$F"')).toEqual(['old.txt'])
+})
+
+test('main screen: each "Baked for" line keeps the turn it first drew', async () => {
+  const t = (id: string, startedAt: number, endedAt: number | null, toolUseIds = ['x']) => ({ id, startedAt, endedAt, toolUseIds }) as unknown as Turn
+  const a = t('a', 0, 32_000)
+  const b = t('b', 40_000, 127_000)
+  const c = t('c', 130_000, null)
+  const pins = new Map([['line-a', 'a']])
+  // An old line redrawn later keeps its own turn, not the newest one.
+  expect(turnForDuration([a, b, c], pins, 'line-a', 32_000, 200_000)?.id).toBe('a')
+  // A new line takes the free turn nearest its length.
+  expect(turnForDuration([a, b, c], pins, 'line-b', 87_000, 200_000)?.id).toBe('b')
+  // A line for a turn with no tool calls draws the engine's own line, even when an older turn is free.
+  const quiet = t('q', 150_000, 153_000, [])
+  expect(turnForDuration([a, b, quiet], pins, 'line-q', 3_000, 200_000)).toBeNull()
+})
+
+const ch = (path: string, added: number, removed: number, more: Partial<Change> = {}) =>
+  ({ path, added, removed, viaBash: false, isTest: false, isDelete: false, outsideRoot: false, addsSkip: false, ...more }) as Change
+
+test('totals: counted lines leave out Bash writes and deletes', async () => {
+  expect(changeTotals([ch('a.ts', 3, 1), ch('b.ts', 0, 0, { viaBash: true }), ch('c.ts', 0, 9, { isDelete: true })])).toEqual({ files: 3, added: 3, removed: 1, counted: true })
+  expect(changeTotals([ch('a.ts', 0, 0, { viaBash: true })]).counted).toBe(false)
+})
+
+test('folders: files group by folder in first-change order, root files under ""', async () => {
+  const f = byFolder([ch('src/a.ts', 1, 0), ch('README.md', 2, 0), ch('src/b.ts', 3, 1), ch('/etc/hosts', 0, 0, { viaBash: true })])
+  expect(f.map(x => [x.dir, x.changes.length, x.added, x.removed])).toEqual([['src/', 2, 4, 1], ['', 1, 2, 0], ['/etc/', 1, 0, 0]])
+})
+
+test('steps: reads merge, repeats stack, a test-file edit is marked', async () => {
+  const log = ['Read src/a.ts', 'Read src/b.ts', 'Read src/a.ts', 'Search decode', 'Edit src/a.ts +3 −1', 'Bash pytest -q · ✗ 2 failed', 'Edit tests/t.py +1 −1', 'Bash git status', 'Bash git status', 'Bash pytest -q · ✓ 9 passed', 'Bash wrote out/x.json', 'Bash deleted old.ts']
+  const s = stepsOf({ log, changes: [ch('tests/t.py', 1, 1, { isTest: true })] })
+  expect(s.map(x => [stepVerb(x.kind), x.text, x.count])).toEqual([
+    ['Read', 'src/a.ts, src/b.ts', 1],
+    ['Search', 'decode', 1],
+    ['Edit', 'src/a.ts +3 −1', 1],
+    ['Test', 'pytest -q ✗ 2 failed', 1],
+    ['Edit', 'tests/t.py +1 −1', 1],
+    ['Ran', 'git status', 2],
+    ['Test', 'pytest -q ✓ 9 passed', 1],
+    ['Write', 'out/x.json via Bash', 1],
+    ['Delete', 'old.ts', 1],
+  ])
+  expect(s[3]!.ok).toBe(false)
+  expect(s[4]!.isTest).toBe(true)
+})
+
+test('go test: top-level tests count once, a build error says so', async () => {
+  const verbose = '=== RUN   TestA\n=== RUN   TestA/sub\n    --- PASS: TestA/sub (0.00s)\n--- PASS: TestA (0.00s)\n--- FAIL: TestB (0.00s)\nFAIL\nFAIL\tatlas/pkg/fields\t0.4s'
+  expect(parseResult('go test', verbose)).toEqual({ passed: 1, failed: 1, skipped: 0 })
+  expect(parseResult('go test', '# atlas/pkg/fields\nkind.go:24:22: syntax error\nFAIL\tatlas/pkg/fields [build failed]\nFAIL')).toEqual({ passed: null, failed: null, skipped: null, note: 'build failed' })
+  expect(parseResult('make test', 'go test ./...\nFAIL\tatlas/pkg/x [setup failed]').note).toBe('build failed')
+})
+
+test('steps: a multi-word runner is a Test step, back-to-back code edits merge, a test-file edit stands alone', async () => {
+  const run = (command: string, out: Partial<TestRun>) => ({ kind: 'test', run: { command, runner: detectRunner(command), passed: null, failed: null, skipped: null, isError: false, ...out } }) as never
+  const log = [
+    logLine('Bash', [run('go test ./pkg/fields', { failed: 1, isError: true })], {}),
+    logLine('Bash', [run('make test', { isError: true, note: 'build failed' })], {}),
+    'Edit pkg/a.go +3 −1', 'Edit pkg/b.go +2 −0', 'Edit pkg/a.go +1 −1', 'Edit pkg/a_test.go +1 −2', 'Edit pkg/c.go +1 −0',
+    logLine('mcp__codegraph__codegraph_explore', [{ kind: 'other' }] as never, { query: 'Batcher' }),
+    logLine('WebFetch', [{ kind: 'other' }] as never, { url: 'https://duckdb.org/docs', prompt: 'how' }),
+  ]
+  expect(stepsOf({ log, changes: [ch('pkg/a_test.go', 1, 2, { isTest: true })] }).map(x => [stepVerb(x.kind), x.text])).toEqual([
+    ['Test', 'go test ./pkg/fields ✗ 1 failed'],
+    ['Test', 'make test ✗ build failed'],
+    ['Edit', '2 files +6 −2 · pkg/a.go, pkg/b.go'],
+    ['Edit', 'pkg/a_test.go +1 −2'],
+    ['Edit', 'pkg/c.go +1 −0'],
+    ['Ran', 'codegraph codegraph_explore Batcher'],
+    ['Ran', 'WebFetch https://duckdb.org/docs'],
+  ])
+})
+
+test('summary: more than two edits in one group read as one count', async () => {
+  const edit = (f: string) => ({ tool: 'Edit', input: { file_path: f }, output: { structuredPatch: [{ lines: ['+x', '-y'] }] }, isRunning: false, isErrored: false })
+  expect(groupSummary([edit('a.go'), edit('b.go')])).toEqual(['a.go +1 −1', 'b.go +1 −1'])
+  expect(groupSummary([edit('a.go'), edit('b.go'), edit('c.go')])).toEqual(['edited 3 files +3 −3'])
+})
+
+test('changed pane: a big turn opens one line per folder, so it fits', async () => {
+  const changes = Array.from({ length: 20 }, (_, i) => ch(`pkg/m${i % 4}/f${i}.go`, 2, 1))
+  expect(paneRows({ changes, diffs: [] } as unknown as Turn, 'changed')).toBe(7)
 })

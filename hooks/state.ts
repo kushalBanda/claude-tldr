@@ -42,6 +42,39 @@ export function turnForCalls(list: readonly Turn[], callIds: readonly string[]):
   return null
 }
 
+const DURATION_SLACK_MS = 10_000
+
+/**
+ * The turn a main-screen "Baked for" line closes. The engine redraws old lines too, so a line keeps the turn it
+ * first drew (`pins`: line requestId to turn id). A new line takes the free turn whose length is nearest its
+ * `durationMs`, else the newest turn when it is free.
+ */
+export function turnForDuration(list: readonly Turn[], pins: ReadonlyMap<string, string>, site: string, durationMs: number, now: number): Turn | null {
+  const pinned = pins.get(site)
+  if (pinned !== undefined) return list.find(t => t.id === pinned) ?? null
+  const taken = new Set(pins.values())
+  const free = list.filter(t => !taken.has(t.id) && t.toolUseIds.length > 0)
+  let best: Turn | null = null
+  let bestGap = Infinity
+  for (const t of free) {
+    const gap = Math.abs((t.endedAt ?? now) - t.startedAt - durationMs)
+    if (gap <= bestGap) [best, bestGap] = [t, gap]
+  }
+  if (best !== null && bestGap <= Math.max(DURATION_SLACK_MS, durationMs / 4)) return best
+  // No length matches (clocks differ): the line that just printed closes the newest turn, if that turn is free.
+  const newest = list.at(-1)
+  return newest !== undefined && free.includes(newest) ? newest : null
+}
+
+// Drawing is pure, so the pins live in the module, like the spinner's site. A hot reload starts them over.
+const durationPins = new Map<string, string>()
+
+export async function durationTurn($: EngineInterface, site: string, durationMs: number): Promise<Turn | null> {
+  const t = turnForDuration(await read($, turns), durationPins, site, durationMs, await $.clock.now())
+  if (t !== null) durationPins.set(site, t.id)
+  return t
+}
+
 export async function latestTurn($: EngineInterface): Promise<Turn | null> {
   const list = await read($, turns)
   return list.at(-1) ?? null
