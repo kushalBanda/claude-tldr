@@ -5,11 +5,11 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-2.1.301%2B-d77757.svg)
-![Network](https://img.shields.io/badge/network-none-success.svg)
+![No network calls](https://img.shields.io/badge/network%20calls-none-success.svg)
 
-![Left: a Claude Code turn as 30 lines of reads, edits and test logs. Right: the same turn as one TL;DR card that flags the changed test file.](docs/images/before-after.png)
+![Left: a Claude Code turn as 33 lines of reads, edits and test logs. Right: the same turn as one TL;DR card that flags the changed test file, and the steps pane under it.](.github/assets/before-after.png)
 
-One fix in Claude Code can print a hundred lines of reads, searches, diffs and test logs. To find out what changed and if it worked, you scroll. TL;DR folds the turn into one card. Every raw line stays one click away.
+One fix in Claude Code can print a hundred lines of reads, searches, diffs and test logs. To find out what changed and if it worked, you scroll. **TL;DR** folds the turn into one card. Every raw line stays one click away.
 
 Look at the image above. Claude edited `tests/conftest.py` in the same turn that made the tests pass. In the plain transcript, that edit is line 28 of 33. On the card, it is the amber **Check** row.
 
@@ -25,20 +25,16 @@ Answer `y` to add the marketplace, then pick a scope (user is the first one). Th
 
 ## What you get
 
-| | |
-| --- | --- |
-| **Turn card** | One card per turn in place of the tool rows. It shows the goal, the time, the size of the turn (`3 files +18 −6`) and its files, the test runs in order, the other commands in one Ran row (`git ×3 · gh`), and what Claude read and searched. The text Claude writes between tool calls folds into the card. The final reply stays. |
-| **Trust flags** | The card turns amber and says what to check: a test file changed in the turn that made tests pass, a write outside the project, a deleted file, an added skip, only or xfail marker, `--no-verify`, or a force push. |
-| **Click to reveal** | Click a row and a pane shows what is behind it. Click the goal and the pane shows the turn as steps. |
-| **Motion** | A spinner that shows the mode (thinking, running tools, writing) and the current job (`Reading src/auth.py`). A band above the prompt: orange while Claude works, red after a failing test, green after a pass. |
-| **Kept cards** | Each finished card is saved for the session. After `/compact` or a resume, `/tldr history` shows the earlier turns. |
-| **Actions** | Copy the reply as clean text, or see the net diff of the turn. |
+- **Turn card:** one card per turn in place of the tool rows. It shows the goal, the time, the size of the turn (`3 files +18 −6`) and its files, the test runs in order, the other commands in one Ran row (`git ×3 · gh`), and what Claude read and searched. The text Claude writes between tool calls folds into the card. The final reply stays.
+- **Trust flags:** the card turns amber and says what to check: a test file changed in the turn that made tests pass, a write outside the project, a deleted file, an added skip, only or xfail marker, `--no-verify`, or a force push.
+- **Click to reveal:** click a row and a pane shows what is behind it. Click the goal and the pane shows the turn as steps.
+- **Motion:** a spinner that shows the mode (thinking, running tools, writing) and the current job (`Reading src/auth.py`). A band above the prompt: orange while Claude works, red after a failing test, green after a pass.
+- **Kept cards:** each finished card is saved for the session. After `/compact` or a resume, `/tldr history` shows the earlier turns.
+- **Actions:** copy the reply as clean text, or see the net diff of the turn.
 
 ### See how the tests went green
 
-Click the goal line. The pane lists every step in order, so you see the test file edit between the red run and the green run.
-
-![The steps pane: Read, Search, Edit, a red test run, two more edits with the test file edit in amber, then a green test run.](docs/images/steps.png)
+Click the goal line. The pane lists every step in order, so you see the test file edit between the red run and the green run. The lower window in the image above shows it.
 
 ### Both layouts
 
