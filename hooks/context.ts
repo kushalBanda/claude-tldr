@@ -1,5 +1,5 @@
-// The context window as one line of colored cells: what fills it, by category, and what is left. Pure.
-// Each used category takes a color from the Plotly qualitative palette.
+// The context window as one line of cells, in two colors you can read without a legend:
+// the conversation, which /compact frees, and the setup, which every request loads. Then the free space. Pure.
 import type { SessionContextBreakdown } from 'claude-code'
 
 const DEFAULT = 0x01000000
@@ -9,36 +9,31 @@ const BUFFER = 0x254c // ╌
 const DIM = 0x5a5650
 const BUFFER_TONE = 0x7a756d
 
-// Plotly's default qualitative colors (plotly.colors.qualitative.Plotly).
-export const PLOTLY = [0x636efa, 0xef553b, 0x00cc96, 0xab63fa, 0xffa15a, 0x19d3f3, 0xff6692, 0xb6e880, 0xff97ff, 0xfecb52]
+export const CONVERSATION_RGB = 0x636efa // Plotly blue: the part /compact frees
+export const SETUP_RGB = 0x9aa0a6 // neutral gray: loaded on every request
+export const hex = (rgb: number) => `#${rgb.toString(16).padStart(6, '0')}`
 
-// The rows /context lists keep one color each, so a row that shows up mid-session never shifts the others.
-// A row it does not name takes the next color left over. Only the color hangs on the name; what counts is `kind`.
-const PINNED: Record<string, number> = {
-  'System prompt': PLOTLY[0]!,
-  'System tools': PLOTLY[1]!,
-  'Memory files': PLOTLY[2]!,
-  Skills: PLOTLY[3]!,
-  Messages: PLOTLY[4]!,
-  'MCP tools': PLOTLY[5]!,
-  'Custom agents': PLOTLY[6]!,
-  'Slash commands': PLOTLY[7]!,
-}
-const SPARE = PLOTLY.slice(8)
+export type SliceKind = 'conversation' | 'setup' | 'free' | 'buffer'
+export type Slice = { name: string; tokens: number; rgb: number; kind: SliceKind }
+export type Row = { name: string; tokens: number }
+// slices: the bar, left to right. setup: the rows the setup slice stands for, for the pane.
+export type ContextFill = { slices: Slice[]; setup: Row[]; used: number; window: number; percent: number }
 
-export type Slice = { name: string; tokens: number; rgb: number; kind: 'used' | 'free' | 'buffer' }
-export type ContextFill = { slices: Slice[]; used: number; window: number; percent: number }
+// The one row /compact shrinks. Every other used row is setup.
+const CONVERSATION_ROW = 'Messages'
 
-/** The breakdown as slices in /context order: used rows with a palette color, then free space, then the compaction buffer. */
+/** The breakdown as conversation, setup, free space and the compaction buffer. Deferred tool schemas sit outside the window. */
 export function contextFill(b: Pick<SessionContextBreakdown, 'categories' | 'totalTokens' | 'rawMaxTokens' | 'percentage'>): ContextFill {
   const used = b.categories.filter(c => c.kind === 'used' && c.tokens > 0)
-  let spare = 0
-  const slices: Slice[] = used.map(c => ({ name: c.name, tokens: c.tokens, rgb: PINNED[c.name] ?? SPARE[spare++ % SPARE.length]!, kind: 'used' }))
-  for (const c of b.categories) {
-    if (c.kind === 'free' && c.tokens > 0) slices.push({ name: c.name, tokens: c.tokens, rgb: DIM, kind: 'free' })
-    if (c.kind === 'buffer' && c.tokens > 0) slices.push({ name: c.name, tokens: c.tokens, rgb: BUFFER_TONE, kind: 'buffer' })
-  }
-  return { slices, used: b.totalTokens, window: b.rawMaxTokens, percent: Math.round(b.percentage) }
+  const setup = used.filter(c => c.name !== CONVERSATION_ROW).map(c => ({ name: c.name, tokens: c.tokens }))
+  const sum = (kind: string, pick = (_: string) => true) => b.categories.filter(c => c.kind === kind && pick(c.name)).reduce((n, c) => n + c.tokens, 0)
+  const slices: Slice[] = [
+    { name: 'conversation', tokens: sum('used', n => n === CONVERSATION_ROW), rgb: CONVERSATION_RGB, kind: 'conversation' },
+    { name: 'setup', tokens: sum('used', n => n !== CONVERSATION_ROW), rgb: SETUP_RGB, kind: 'setup' },
+    { name: 'free', tokens: sum('free'), rgb: DIM, kind: 'free' },
+    { name: 'reserved for auto-compact', tokens: sum('buffer'), rgb: BUFFER_TONE, kind: 'buffer' },
+  ]
+  return { slices: slices.filter(s => s.tokens > 0), setup, used: b.totalTokens, window: b.rawMaxTokens, percent: Math.round(b.percentage) }
 }
 
 /**
@@ -50,7 +45,7 @@ export function sliceWidths(slices: readonly Slice[], columns: number): number[]
   if (total <= 0 || columns <= 0) return slices.map(() => 0)
   const exact = slices.map(s => (s.tokens / total) * columns)
   const out = exact.map(Math.floor)
-  slices.forEach((s, i) => { if (s.kind === 'used' && out[i] === 0 && columns >= slices.length) out[i] = 1 })
+  slices.forEach((s, i) => { if ((s.kind === 'conversation' || s.kind === 'setup') && out[i] === 0 && columns >= slices.length) out[i] = 1 })
   let left = columns - out.reduce((n, w) => n + w, 0)
   const order = exact.map((x, i) => ({ i, r: x - Math.floor(x) })).sort((a, b) => b.r - a.r)
   for (let k = 0; left > 0 && order.length > 0; k = (k + 1) % order.length, left--) out[order[k]!.i]!++
@@ -71,7 +66,7 @@ export function contextCells(fill: ContextFill, columns: number): Uint32Array {
   let at = 0
   fill.slices.forEach((s, i) => {
     for (let k = 0; k < widths[i]! && at < cols; k++, at++) {
-      cells[at * 3] = s.kind === 'used' ? FULL : s.kind === 'free' ? FREE : BUFFER
+      cells[at * 3] = s.kind === 'free' ? FREE : s.kind === 'buffer' ? BUFFER : FULL
       cells[at * 3 + 1] = s.rgb
       cells[at * 3 + 2] = DEFAULT
     }
@@ -98,8 +93,13 @@ export function contextLevel(percent: number): Level {
   return percent >= FULL_AT ? 'full' : percent >= WARN_AT ? 'warn' : 'ok'
 }
 
-/** The label beside the bar: "62% · 124k/200k", and a pointer to /compact once the window is nearly full. */
+/** The short figure: "62% · 124k/200k", and a pointer to /compact once the window is nearly full. */
 export function contextLabel(fill: ContextFill): string {
   const base = `${fill.percent}% · ${tokens(fill.used)}/${tokens(fill.window)}`
   return contextLevel(fill.percent) === 'full' ? `${base} · /compact` : base
+}
+
+/** The tokens of one slice kind, 0 when absent. */
+export function sliceTokens(fill: ContextFill, kind: SliceKind): number {
+  return fill.slices.find(s => s.kind === kind)?.tokens ?? 0
 }

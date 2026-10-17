@@ -1,8 +1,8 @@
-// The context bar: what fills the window, by category, in Plotly colors, with a label that warns near full.
+// The context bar: the conversation (what /compact frees), the setup, and the room left, with a label that names each color.
 import { expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { contextCells, contextFill, contextLabel, contextLevel, PLOTLY, sliceWidths, tokens } from '../hooks/context'
+import { CONVERSATION_RGB, contextCells, contextFill, contextLabel, contextLevel, SETUP_RGB, sliceWidths, tokens } from '../hooks/context'
 
 const MAIN = { columns: 120, rows: 40, isFullscreen: false }
 const band = { plugin: 'tldr', surface: 'terminal' as const, component: 'AbovePrompt' as const, requestId: 'band', viewport: MAIN, props: { bodyColumns: 100, hasSurvey: false, isWorking: false, maxRows: 10 } as never }
@@ -18,22 +18,19 @@ function usage(on: On, b: unknown = BREAKDOWN) {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e) => $.ui.resolve(e).Text({ children: 'engine band' } as never) as never)
 }
 
-test('fill: each row keeps its Plotly color; deferred rows are left out; free and buffer follow', async () => {
+test('fill: Messages is the conversation; every other used row is setup; deferred rows are left out', async () => {
   const f = contextFill(BREAKDOWN)
-  expect(f.slices.map(s => s.name)).toEqual(['System prompt', 'System tools', 'Memory files', 'Messages', 'Free space', 'Autocompact buffer'])
-  expect(f.slices.slice(0, 4).map(s => s.rgb)).toEqual([PLOTLY[0], PLOTLY[1], PLOTLY[2], PLOTLY[4]])
-  // A row that shows up later leaves the others as they were; an unknown row takes a spare color.
-  const later = contextFill({ ...BREAKDOWN, categories: [cat('Skills', 2_000), cat('New thing', 1_000), ...BREAKDOWN.categories] })
-  expect(later.slices.find(s => s.name === 'Messages')!.rgb).toBe(PLOTLY[4])
-  expect(later.slices.find(s => s.name === 'New thing')!.rgb).toBe(PLOTLY[8])
+  expect(f.slices.map(s => [s.kind, s.tokens])).toEqual([['conversation', 97_000], ['setup', 27_000], ['free', 43_000], ['buffer', 33_000]])
+  expect(f.slices.slice(0, 2).map(s => s.rgb)).toEqual([CONVERSATION_RGB, SETUP_RGB])
+  expect(f.setup.map(r => r.name)).toEqual(['System prompt', 'System tools', 'Memory files'])
   expect(f.percent).toBe(62)
 })
 
 test('widths: sum to the columns, and a small used row keeps one cell', async () => {
-  const f = contextFill({ ...BREAKDOWN, categories: [cat('Tiny', 100), cat('Messages', 150_000), cat('Free space', 49_900, 'free')] })
+  const f = contextFill({ ...BREAKDOWN, categories: [cat('Messages', 150_000), cat('Tiny', 100), cat('Free space', 49_900, 'free')] })
   const w = sliceWidths(f.slices, 40)
   expect(w.reduce((a, b) => a + b, 0)).toBe(40)
-  expect(w[0]).toBe(1)
+  expect(w[1]).toBe(1)
   expect(contextCells(f, 40).length).toBe(120)
 })
 
@@ -53,13 +50,13 @@ test('band: the bar and its label draw after a measure, and 7 opens the context 
   await $.command.run({ command: 'tldr', args: 'context', origin: { kind: 'composer' } } as never)
   const ui = await $.ui.mount(band)
   const text = JSON.stringify(await ui.drawn())
-  for (const s of ['tldr-context-bar', '62% · 124k/200k', '"hotkey":"7"', 'engine band']) expect(text).toContain(s)
+  for (const s of ['tldr-context-bar', '62% full', 'conversation 97k', 'setup 27k', '"color":"#636efa"', '"hotkey":"7"', 'engine band']) expect(text).toContain(s)
   await ui.press({ key: 'tldr-context-open' })
   expect(opened).toEqual(['tldr-context', 'tldr-context'])
   const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-context', viewport: MAIN, props: {} as never })
   const p = JSON.stringify(await pane.drawn())
-  for (const s of ['System prompt', 'Messages', '97k', 'Free space', 'Autocompact buffer']) expect(p).toContain(s)
-  expect(p).not.toContain('/compact frees')
+  for (const s of ['62% full · 124k of 200k', 'conversation', '/compact frees this', 'setup', 'loaded on every request', '  System prompt', 'free', 'reserved for auto-compact']) expect(p).toContain(s)
+  expect(p).not.toContain('/compact shrinks')
 })
 
 test('band: amber label at 80%', async ($, on) => {

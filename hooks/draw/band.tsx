@@ -2,8 +2,9 @@
 import type { EngineInterface, RenderElement, RenderInput } from 'claude-code'
 
 import type { Turn } from '../../types'
-import { contextCells, contextLabel, contextLevel } from '../context'
+import { contextCells, contextLevel, hex, sliceTokens, tokens } from '../context'
 import type { ContextFill } from '../context'
+import { CONVERSATION_RGB, SETUP_RGB } from '../context'
 import { encodeCells } from '../motion'
 import type { Section } from './detail'
 import { color } from './theme'
@@ -39,10 +40,15 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest
   const { Box, Text, Button, Raster } = $.ui.resolve(e as RenderInput<'AbovePrompt', 'terminal'>)
   const reveal = parts.reveal
   const ctx = parts.context
-  const label = ctx !== null ? contextLabel(ctx.fill) : ''
+  // The label names each color in that color, so the bar reads without a legend: "62% full · conversation 94k · setup 30k".
   const level = ctx !== null ? contextLevel(ctx.fill.percent) : 'ok'
-  // The label and its hotkey take their own cells; the bar takes the rest.
-  const barColumns = Math.max(4, e.props.bodyColumns - label.length - 4)
+  const head = ctx !== null ? `${ctx.fill.percent}% full${level === 'full' ? ' · /compact' : ''}` : ''
+  const conv = ctx !== null ? `conversation ${tokens(sliceTokens(ctx.fill, 'conversation'))}` : ''
+  const setup = ctx !== null ? `setup ${tokens(sliceTokens(ctx.fill, 'setup'))}` : ''
+  const wide = e.props.bodyColumns >= 72
+  const labelLength = head.length + (wide ? conv.length + setup.length + 6 : 0)
+  // The label and its hotkey ("7: ") take their own cells; the bar takes the rest.
+  const barColumns = Math.max(4, e.props.bodyColumns - labelLength - 4)
   return (
     <Box key="tldr-bands" flexDirection="column">
       {rest}
@@ -59,7 +65,11 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest
         <Box key="tldr-context-row" flexDirection="row" columnGap={1}>
           <Raster key={CONTEXT_KEY} columns={barColumns} rows={1} cells={encodeCells(contextCells(ctx.fill, barColumns))} />
           <Button key="tldr-context-open" hotkey={CONTEXT_HOTKEY} plain onPress={ctx.open}>
-            <Text color={level === 'full' ? color.fail : level === 'warn' ? color.check : color.dim}>{label}</Text>
+            <Text color={level === 'full' ? color.fail : level === 'warn' ? color.check : color.text}>{head}</Text>
+            {wide ? <Text color={color.dim}>{' · '}</Text> : null}
+            {wide ? <Text color={hex(CONVERSATION_RGB)}>{conv}</Text> : null}
+            {wide ? <Text color={color.dim}>{' · '}</Text> : null}
+            {wide ? <Text color={hex(SETUP_RGB)}>{setup}</Text> : null}
           </Button>
         </Box>
       ) : null}

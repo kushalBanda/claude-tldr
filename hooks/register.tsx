@@ -379,7 +379,7 @@ async function measureContext($: EngineInterface) {
 
 async function openContext($: EngineInterface) {
   await measureContext($)
-  await $.ui.open({ id: CONTEXT_PANE, title: 'TL;DR context', focus: true, closeOnEscape: true, rows: (contextNow?.slices.length ?? 1) + 3 })
+  await $.ui.open({ id: CONTEXT_PANE, title: 'TL;DR context', focus: true, closeOnEscape: true, rows: (contextNow?.slices.length ?? 1) + (contextNow?.setup.length ?? 0) + 3 })
 }
 
 async function openDiff($: EngineInterface, t: Turn) {
