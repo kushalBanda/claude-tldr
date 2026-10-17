@@ -68,7 +68,7 @@ test('/tldr show opens the detail behind a row', async ($, on) => {
   const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-detail', viewport: FULL, props: {} as never })
   const text = JSON.stringify(await pane.drawn())
   // Grouped by folder: each folder with its total, each file by name under it.
-  for (const s of ['3 files · +18 −6', '"src/"', '+16 −4', '"  auth.py"', '+12 −3', '"tests/"', '"  conftest.py"']) expect(text).toContain(s)
+  for (const s of ['"3 files · "', '"+18"', '"−6"', '"src/"', '"+16"', '"  auth.py"', '"+12"', '"color":"success"', '"color":"error"', '"tests/"', '"  conftest.py"']) expect(text).toContain(s)
   expect((await $.command.run({ command: 'tldr', ...RUN, args: 'show nonsense' })).text).toContain('no row "nonsense"')
 })
 

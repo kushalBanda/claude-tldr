@@ -7,7 +7,7 @@ import type { Kept, Live, Turn } from '../types'
 const MAX_TURNS = 200 // a session's cards held in memory; older ones drop
 
 export const turns = atom({ plugin: 'tldr', key: 'turns' } as const, [] as Turn[])
-export const live = atom({ plugin: 'tldr', key: 'live' } as const, { phase: 'idle', word: '', last: null, flagged: false } as Live)
+export const live = atom({ plugin: 'tldr', key: 'live' } as const, { phase: 'idle', word: '' } as Live)
 export const kept = atom({ plugin: 'tldr', key: 'kept' } as const, { count: 0, note: false } as Kept)
 export const current = atom({ plugin: 'tldr', key: 'current' } as const, null as string | null)
 
@@ -89,7 +89,7 @@ export async function readLive($: EngineInterface): Promise<Live> {
 }
 
 export async function setLive($: EngineInterface, fn: (l: Live) => Live): Promise<void> {
-  await update($, live, l => fn(l ?? { phase: 'idle', word: '', last: null, flagged: false }))
+  await update($, live, l => fn(l ?? { phase: 'idle', word: '' }))
 }
 
 const KEPT_MAX = 50 // cards kept on disk per session

@@ -155,7 +155,7 @@ export function isQuiet(call: GroupCall, root?: string): boolean {
   return classify(call.tool, call.input, call.output, call.isErrored, root).every(c => c.kind === 'other')
 }
 
-/** What Claude is doing now, for the spinner and the band: "Reading src/auth.py". */
+/** What Claude is doing now, for the spinner: "Reading src/auth.py". */
 export function activityWord(tool: string, input: unknown): string {
   const i = input !== null && typeof input === 'object' ? (input as Record<string, unknown>) : {}
   const path = typeof i.file_path === 'string' ? i.file_path : typeof i.notebook_path === 'string' ? i.notebook_path : undefined

@@ -1,8 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { bandLabel, bandState } from '../hooks/draw/band'
-import { bandFrame, encodeCells, spinnerFrame } from '../hooks/motion'
+import { encodeCells, spinnerFrame } from '../hooks/motion'
 import { activityWord } from '../hooks/summary'
 import { CALL_IDS, engine, play } from './fixtures/login-bug'
 
@@ -41,23 +40,6 @@ test('spinner frames differ by mode and move over time', async () => {
   expect(spinnerFrame('thinking', 0).length).toBe(9 * 3)
 })
 
-test('band frames: red line on a failure, thin dim line when idle, a moving light only while working', async () => {
-  const fail = bandFrame('fail', 0, 10, true)
-  expect(fail[1]).toBe(0xe46a5e)
-  const idle = bandFrame('idle', 0, 10, true)
-  expect(idle[0]).toBe(0x2500)
-  expect(Array.from(bandFrame('working', 200, 30, true)).join()).not.toBe(Array.from(bandFrame('working', 900, 30, true)).join())
-  expect(Array.from(bandFrame('working', 200, 30, false)).join()).toBe(Array.from(bandFrame('working', 900, 30, false)).join())
-})
-
-test('band label and state follow the live phase and the latest test result', async () => {
-  expect(bandLabel({ phase: 'working', word: 'Reading a.py', last: null, flagged: false })).toBe('working · Reading a.py')
-  expect(bandState({ phase: 'working', word: '', last: 'fail', flagged: false })).toBe('fail')
-  expect(bandLabel({ phase: 'working', word: '', last: 'fail', flagged: false })).toBe('tests failing')
-  expect(bandLabel({ phase: 'idle', word: '', last: 'pass', flagged: false })).toBe('idle · tests green')
-  expect(bandState({ phase: 'idle', word: '', last: 'pass', flagged: false })).toBe('idle')
-})
-
 test('activity words name what Claude does', async () => {
   expect(activityWord('Read', { file_path: 'src/auth.py' })).toBe('Reading src/auth.py')
   expect(activityWord('Edit', { file_path: 'a.ts' })).toBe('Editing a.ts')
@@ -89,24 +71,14 @@ test('spinner: desktop keeps the engine spinner', async ($, on) => {
   expect(JSON.stringify(await ui.drawn())).toContain('engine spinner')
 })
 
-test('band: idle with tests green after the login-bug turn, other mods kept above', async ($, on) => {
+test('band: no line of its own; other mods kept, nothing added in fullscreen', async ($, on) => {
   engine(on)
   engineDraws(on)
   await play($)
   const text = JSON.stringify(await (await $.ui.mount(band)).drawn())
   expect(text).toContain('other mod band')
-  expect(text).toContain('idle · tests green')
-  expect(text).toContain('"type":"Raster"')
-})
-
-test('band: red with tests failing right after a failing run', async ($, on) => {
-  engine(on)
-  engineDraws(on)
-  await $.turn.start({ turnId: 't', text: 'go' } as never)
-  await $.tool.call({ tool: 'Bash', command: 'pytest -q', tool_use_id: 'b1' } as never)
-  const text = JSON.stringify(await (await $.ui.mount(band)).drawn())
-  expect(text).toContain('tests failing')
-  expect(text).toContain('"color":"error"')
+  expect(text).not.toContain('"type":"Raster"')
+  expect(text).not.toContain('tldr-reveal')
 })
 
 test('card: the newest change flashes right after it lands', async ($, on) => {
@@ -120,4 +92,45 @@ test('card: the newest change flashes right after it lands', async ($, on) => {
   })
   expect(JSON.stringify(await ui.drawn())).toContain('"backgroundColor":"success"')
   void CALL_IDS
+})
+
+const MAIN = { columns: 120, rows: 40, isFullscreen: false }
+const mainBand = { ...band, viewport: MAIN }
+
+test('main screen: the band holds the card rows as digit keys, and a key opens the pane', async ($, on) => {
+  const opened: string[] = []
+  on('ui.open', async (_$, e) => { opened.push((e as { id: string }).id); return { value: { isPlaced: true } } as never })
+  engine(on)
+  engineDraws(on)
+  await play($)
+  const ui = await $.ui.mount(mainBand)
+  for (const s of ['all', 'changed', 'tests', 'check', 'looked']) expect(await ui.find({ key: `tldr-reveal:${s}:turn-login` })).toBeDefined()
+  expect(await ui.find({ key: 'tldr-reveal:ran:turn-login' })).toBeUndefined()
+  const text = JSON.stringify(await ui.drawn())
+  for (const s of ['"hotkey":"1"', '"label":"steps"', '"hotkey":"3"', '"label":"tests"']) expect(text).toContain(s)
+  await ui.press({ key: 'tldr-reveal:tests:turn-login' })
+  expect(opened).toEqual(['tldr-detail'])
+  const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-detail', viewport: MAIN, props: {} as never })
+  expect(JSON.stringify(await pane.drawn())).toContain('12 passed')
+})
+
+test('the band shows no row keys in fullscreen, while Claude works, or before a turn ends', async ($, on) => {
+  engine(on)
+  engineDraws(on)
+  const none = async (input: typeof band) => {
+    const ui = await $.ui.mount(input)
+    expect(await ui.find({ key: 'tldr-reveal:all:turn-login' })).toBeUndefined()
+    await ui.unmount()
+  }
+  await none(mainBand)
+  await play($)
+  await none(band)
+  await none({ ...mainBand, props: { bodyColumns: 100, hasSurvey: false, isWorking: true, maxRows: 10 } as never })
+})
+
+test('card off: the band shows no row keys', { options: { card: false } }, async ($, on) => {
+  engine(on)
+  engineDraws(on)
+  await play($)
+  expect(await (await $.ui.mount(mainBand)).find({ key: 'tldr-reveal:all:turn-login' })).toBeUndefined()
 })

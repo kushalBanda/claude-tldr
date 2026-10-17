@@ -7,6 +7,7 @@ import type { EngineInterface, RenderInput } from 'claude-code'
 import { groupSummary, isQuiet } from '../summary'
 import type { GroupCall } from '../summary'
 import { color } from './theme'
+import { countParts } from './tint'
 
 export function drawCompactLine($: EngineInterface, e: RenderInput<'ToolGroup'> | RenderInput<'ToolUse'>, calls: readonly GroupCall[], root?: string) {
   const { Box, Text } = $.ui.resolve(e)
@@ -15,7 +16,9 @@ export function drawCompactLine($: EngineInterface, e: RenderInput<'ToolGroup'> 
   return (
     <Text key="tldr-line" wrap="truncate-end">
       <Text color={color.accent}>{'⏺ '}</Text>
-      <Text color={color.dim}>{parts.length > 0 ? parts.join(' · ') : 'tool calls'}</Text>
+      <Text color={color.dim}>
+        {countParts(parts.length > 0 ? parts.join(' · ') : 'tool calls').map(p => (p.tone === undefined ? p.text : <Text color={p.tone === 'added' ? color.added : color.removed}>{p.text}</Text>))}
+      </Text>
     </Text>
   )
 }

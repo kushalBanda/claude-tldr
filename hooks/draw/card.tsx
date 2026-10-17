@@ -53,8 +53,8 @@ export function drawCard($: EngineInterface, e: RenderInput<'ToolGroup'> | Rende
   const isExpanded = o.isExpanded
   const flash = (kind: 'change' | 'test', key: string) =>
     o.pulse === true && o.now !== undefined && t.pulse !== null && t.pulse.kind === kind && t.pulse.key === key && o.now - t.pulse.at < PULSE_MS
-  // The card is the TL;DR; the detail sits one press away (a click in fullscreen, /tldr show on the main screen).
-  const hint = o.show !== undefined ? `click a row ${glyph.expand}` : '/tldr show'
+  // The card is the TL;DR; the detail sits one press away: a click in fullscreen; on the main screen, a digit key on the band or /tldr show.
+  const hint = o.show !== undefined ? `click a row ${glyph.expand}` : 'type 1 for steps · /tldr show'
   // A row's value as one press target: the whole value opens its detail, nothing about it changes but the cursor.
   const pressable = (s: Section, children: RenderChildren, n = 0) =>
     o.show !== undefined ? (

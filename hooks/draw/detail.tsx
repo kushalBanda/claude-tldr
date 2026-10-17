@@ -8,6 +8,7 @@ import { byFolder, changeTotals, stepsOf, stepVerb } from '../steps'
 import type { Step } from '../steps'
 import { testLabel } from '../summary'
 import { runPart } from '../tests-parse'
+import { countParts } from './tint'
 import { color, glyph } from './theme'
 
 export const DETAIL_PANE = 'tldr-detail'
@@ -71,14 +72,18 @@ export function drawDetail($: EngineInterface, e: RenderInput<'Pane'>, t: Turn |
   if (t === null) return <Box key="tldr-detail"><Text color={color.dim}>No turn yet.</Text></Box>
 
   const empty = (what: string) => <Text color={color.dim}>{what}</Text>
+  // A text with its line counts in green and red; the rest keeps the given color.
+  const tinted = (text: string, base?: string) => (
+    <Text color={base}>{countParts(text).map(p => (p.tone === undefined ? p.text : <Text color={p.tone === 'added' ? color.added : color.removed}>{p.text}</Text>))}</Text>
+  )
   // One list row: the name on the left, its fact dim on the right.
   const line = (name: string, fact?: string, factColor: string = color.dim) => (
     <Box flexDirection="row" justifyContent="space-between" columnGap={2}>
       <Text wrap="truncate-end">{name}</Text>
-      {fact !== undefined ? <Text color={factColor}>{fact}</Text> : null}
+      {fact !== undefined ? tinted(fact, factColor) : null}
     </Box>
   )
-  const heading = (text: string) => <Text color={color.label}>{text}</Text>
+  const heading = (text: string) => tinted(text, color.label)
 
   const looked = () => (
     <Box flexDirection="column">
@@ -178,7 +183,7 @@ export function drawDetail($: EngineInterface, e: RenderInput<'Pane'>, t: Turn |
           <Box flexDirection="row" columnGap={1}>
             <Box width={3} flexShrink={0}><Text color={color.dim}>{String(first + i + 1).padStart(2)}</Text></Box>
             <Box width={VERB_WIDTH} flexShrink={0}><Text color={color.label}>{stepVerb(s.kind)}</Text></Box>
-            <Text color={tone(s)} wrap="truncate-end">{s.text}</Text>
+            {tone(s) === undefined ? <Text wrap="truncate-end">{tinted(s.text)}</Text> : <Text color={tone(s)} wrap="truncate-end">{s.text}</Text>}
             {s.count > 1 ? <Text color={color.dim}>{`×${s.count}`}</Text> : null}
             {s.isTest ? <Text color={flagged ? color.check : color.dim}>test file</Text> : null}
           </Box>

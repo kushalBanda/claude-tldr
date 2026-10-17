@@ -1,4 +1,4 @@
-// Calls a summary line cannot name stack into the card's Ran row; /compact moves the band while it runs.
+// Calls a summary line cannot name stack into the card's Ran row; /compact moves the spinner while it runs.
 import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
@@ -8,7 +8,7 @@ import { engine } from './fixtures/login-bug'
 
 const FULL = { columns: 120, rows: 40, isFullscreen: true }
 const MAIN = { columns: 120, rows: 40, isFullscreen: false }
-const band = { plugin: 'tldr', surface: 'terminal' as const, component: 'AbovePrompt' as const, requestId: 'band', viewport: FULL, props: { bodyColumns: 100, hasSurvey: false, isWorking: false, maxRows: 10 } as never }
+const spinner = (requestId: string) => ({ plugin: 'tldr', surface: 'terminal' as const, component: 'Spinner' as const, requestId, viewport: FULL, props: { word: 'Sautéing', message: null, suffix: '…', mode: 'thinking' } as never })
 
 const drawn = async ($: Engine, input: Parameters<Engine['ui']['mount']>[0]) => JSON.stringify(await (await $.ui.mount(input)).drawn())
 const row = (id: string, command: string, viewport = MAIN) => ({
@@ -71,7 +71,7 @@ test('card: a turn with no such call has no Ran row', async ($, on) => {
 
 const MESSAGES = [{ role: 'user', text: 'summary of earlier work', toolUses: [] }]
 
-/** A compaction that holds until released, so the test can draw the band while it runs. */
+/** A compaction that holds until released, so the test can draw the spinner while it runs. */
 function slowCompact(on: On) {
   let release = () => {}
   let entered = () => {}
@@ -82,32 +82,26 @@ function slowCompact(on: On) {
     await gate
     return { messages: e.messages } as never
   })
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e) => {
-    const { Text } = $.ui.resolve(e)
-    return <Text>engine band</Text>
-  })
   return { release, reached }
 }
 
-test('/compact: the band says compacting while it runs, and idle after', async ($, on) => {
+test('/compact: the spinner says Compacting while it runs, and not after', async ($, on) => {
   engine(on)
   const c = slowCompact(on)
   const done = $.session.compact({ trigger: 'manual', messages: MESSAGES } as never)
   await c.reached
-  expect(await drawn($, band)).toContain('compacting')
+  expect(await drawn($, spinner('s1'))).toContain('Compacting')
   c.release()
   await done
-  const after = await drawn($, { ...band, requestId: 'band-after' })
-  expect(after).not.toContain('compacting')
-  expect(after).toContain('idle')
+  expect(await drawn($, spinner('s2'))).not.toContain('Compacting')
 })
 
-test('/compact: a precompute runs unseen, the band stays idle', async ($, on) => {
+test('/compact: a precompute runs unseen', async ($, on) => {
   engine(on)
   const c = slowCompact(on)
   const done = $.session.compact({ trigger: 'precompute', messages: MESSAGES } as never)
   await c.reached
-  expect(await drawn($, band)).not.toContain('compacting')
+  expect(await drawn($, spinner('s1'))).not.toContain('Compacting')
   c.release()
   await done
 })

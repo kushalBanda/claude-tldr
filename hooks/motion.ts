@@ -1,17 +1,12 @@
-// Frames for the spinner and the band, as Raster cells. Pure: same inputs, same frame.
+// Frames for the spinner, as Raster cells. Pure: same inputs, same frame.
 // A cell is [codePoint, foreground, background], each a little-endian u32; 0x01000000 is the terminal's default.
 
 export type SpinnerMode = 'requesting' | 'responding' | 'thinking' | 'tool-input' | 'tool-use'
-export type BandState = 'working' | 'fail' | 'pass' | 'idle'
 
 const DEFAULT = 0x01000000
 const ACCENT = 0xd97757 // Claude Code's orange
 const DIM = 0x5a5650
-const RED = 0xe46a5e
-const GREEN = 0x86b872
 const BARS = [0x2581, 0x2582, 0x2583, 0x2584, 0x2585, 0x2586, 0x2587, 0x2588] // ▁ … █
-const LINE = 0x2501 // ━
-const THIN = 0x2500 // ─
 
 export const SPINNER_COLUMNS = 9
 
@@ -47,21 +42,6 @@ export function spinnerFrame(mode: SpinnerMode, ms: number, columns = SPINNER_CO
     }
     cells[i * 3] = bar(level)
     cells[i * 3 + 1] = mix(DIM, ACCENT, glow)
-    cells[i * 3 + 2] = DEFAULT
-  }
-  return cells
-}
-
-/** The band's line: orange with a moving light while working, red on a failure, green on a pass, dim when idle. */
-export function bandFrame(state: BandState, ms: number, columns: number, animate: boolean): Uint32Array {
-  const cols = Math.max(1, columns)
-  const cells = new Uint32Array(cols * 3)
-  const base = state === 'working' ? ACCENT : state === 'fail' ? RED : state === 'pass' ? GREEN : DIM
-  const sweep = animate && state === 'working' ? ((ms / 1300) % 1) * (cols + 12) - 6 : -100
-  for (let i = 0; i < cols; i++) {
-    const near = Math.max(0, 1 - Math.abs(i - sweep) / 6)
-    cells[i * 3] = state === 'idle' ? THIN : LINE
-    cells[i * 3 + 1] = near > 0 ? mix(base, 0xffffff, near * 0.7) : base
     cells[i * 3 + 2] = DEFAULT
   }
   return cells

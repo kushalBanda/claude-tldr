@@ -52,8 +52,6 @@ export type Pulse = { kind: 'change' | 'test'; key: string; at: number }
 export type Live = {
   phase: 'idle' | 'working' | 'compacting'
   word: string // what Claude does now: "Reading src/auth.py"
-  last: 'pass' | 'fail' | null // the latest test result while working
-  flagged: boolean // the current turn has a trust flag
 }
 
 /** Cards kept on disk; shown after /compact or a resume. */

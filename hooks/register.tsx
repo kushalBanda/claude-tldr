@@ -8,7 +8,7 @@ import { addDiff, cleanCopy, diffOf, mergeNet, turnDiff } from './actions'
 import { classify, placePath } from './classify'
 import { unifiedDiff } from './netdiff'
 import { drawCard, PULSE_MS } from './draw/card'
-import { BAND_KEY, bandColumns, bandLabel, bandState, drawBand, keptNote } from './draw/band'
+import { drawBand, keptNote, revealKeys } from './draw/band'
 import { drawCompactLine } from './draw/compact-line'
 import { DETAIL_PANE, drawDetail, paneRows, paneTitle, sectionOf } from './draw/detail'
 import type { Section } from './draw/detail'
@@ -16,7 +16,7 @@ import { DIFF_PANE, drawDiff } from './draw/diff'
 import { drawHistory, HISTORY_PANE } from './draw/history'
 import { drawSpinner, SPINNER_KEY } from './draw/spinner'
 import { readFeatures } from './features'
-import { bandFrame, encodeCells, spinnerFrame } from './motion'
+import { encodeCells, spinnerFrame } from './motion'
 import type { SpinnerMode } from './motion'
 import { allTurns, closeCurrent, durationTurn, latestTurn, loadKept, openTurn, readKept, readLive, saveKept, setKept, setLive, turnForCalls, updateCurrent, updateTurn } from './state'
 import { activityWord, isMeta, logLines, runName } from './summary'
@@ -25,12 +25,11 @@ import { endTurn, isInterim, recordCall, recordStep, startTurn, toKept } from '.
 
 const HELP = 'TL;DR is on. Click a card row for its detail, or /tldr show [changed|tests|check|ran|looked] · /tldr history · /tldr copy · /tldr diff'
 
-// The frame loop repaints the spinner and the band between renders (module state: a reload restarts it).
+// The frame loop repaints the spinner between renders (module state: a reload restarts it).
 const FRAME_MS = 80
 let frameMs = 0
 let loop: Timer | undefined
 let spinnerSite: { requestId: string; mode: SpinnerMode } | null = null
-let bandSite: { requestId: string; columns: number; live: Live } | null = null
 // The turn the diff pane shows: the card whose diff button was pressed last.
 let diffFor: string | null = null
 // What the detail pane shows: the turn and the row pressed last (or /tldr show).
@@ -49,11 +48,6 @@ function startLoop($: EngineInterface) {
     if (spin !== null)
       void $.ui.blit({ requestId: spin.requestId, key: SPINNER_KEY, cells: encodeCells(spinnerFrame(spin.mode, frameMs)) })
         .then(r => { if (r.deny !== undefined && spinnerSite === spin) spinnerSite = null })
-        .catch(() => {})
-    const band = bandSite
-    if (band !== null && bandState(band.live) === 'working')
-      void $.ui.blit({ requestId: band.requestId, key: BAND_KEY, cells: encodeCells(bandFrame('working', frameMs, band.columns, true)) })
-        .then(r => { if (r.deny !== undefined && bandSite === band) bandSite = null })
         .catch(() => {})
   })
 }
@@ -89,7 +83,7 @@ export const register: Register = (on, options) => {
       await openTurn($, startTurn(e.turnId, e.text, await $.clock.now()))
       if (f.keep) await setKept($, k => ({ ...k, note: false })).catch(() => {})
       if (f.motion) {
-        await setLive($, () => ({ phase: 'working', word: 'Thinking', last: null, flagged: false })).catch(() => {})
+        await setLive($, () => ({ phase: 'working', word: 'Thinking' })).catch(() => {})
         if (f.animation) startLoop($)
       }
     }
@@ -101,7 +95,7 @@ export const register: Register = (on, options) => {
     // Link the call to the turn first: the engine draws its group while the call still runs.
     if (e.agentId === undefined) {
       await updateCurrent($, t => recordCall(t, e.tool_use_id, [])).catch(() => {})
-      if (f.motion) await setLive($, l => ({ ...l, word: activityWord(e.tool, e), last: null })).catch(() => {})
+      if (f.motion) await setLive($, l => ({ ...l, word: activityWord(e.tool, e) })).catch(() => {})
       const path = editPath(e.tool, e)
       if (f.actions && path !== undefined && !befores.has(path)) {
         // Missing (ENOENT) is a new file, empty before; any other failure leaves the net diff unknown.
@@ -127,18 +121,8 @@ export const register: Register = (on, options) => {
       if (c?.kind === 'test') return { ...done, pulse: { kind: 'test', key: String(done.testRuns.length - 1), at: now } }
       return done
     }).catch(() => {})
-    if (f.trust && f.motion) {
-      const t = await latestTurn($)
-      const flagged = t !== null && t.endedAt === null && t.flags.length > 0
-      await setLive($, l => ({ ...l, flagged })).catch(() => {})
-    }
-    const test = calls.find(c => c.kind === 'test')
-    if (f.motion && test?.kind === 'test') {
-      const failed = test.run.isError || (test.run.failed ?? 0) > 0
-      await setLive($, l => ({ ...l, last: failed ? 'fail' : 'pass' })).catch(() => {})
-    }
     // The flash ends on the next draw after it runs out.
-    if (f.motion && f.animation && (calls[0]?.kind === 'change' || test !== undefined)) $.clock.after(PULSE_MS + 50, () => $.ui.invalidate('ui.render'))
+    if (f.motion && f.animation && (calls[0]?.kind === 'change' || calls.some(c => c.kind === 'test'))) $.clock.after(PULSE_MS + 50, () => $.ui.invalidate('ui.render'))
     return ran
   }).catch(($, e, next) => next(e)) // a failure here must never stop or change a tool call
 
@@ -273,7 +257,7 @@ export const register: Register = (on, options) => {
     const l = await readLive($)
     const t = await latestTurn($)
     const now = await $.clock.now()
-    const word = e.props.message ?? (l.phase === 'working' && l.word ? l.word : e.props.word)
+    const word = e.props.message ?? (l.phase !== 'idle' && l.word ? l.word : e.props.word)
     // Any spinner moves, not only a turn's: /compact draws one with no turn open.
     if (f.animation) {
       spinnerSite = { requestId: e.requestId, mode: e.props.mode as SpinnerMode }
@@ -282,20 +266,21 @@ export const register: Register = (on, options) => {
     return drawSpinner($, e, word, t !== null && t.endedAt === null ? now - t.startedAt : null, frameMs)
   })
 
-  // The state band above the prompt; what other mods draw there stays, above it.
+  // The band above the prompt: the kept-cards note and the row keys; what other mods draw there stays, above it.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const rest = await next(e)
     if (e.surface !== 'terminal' || e.props.hasSurvey) return rest
     const k = f.keep ? await readKept($) : { count: 0, note: false }
     const note = k.note && k.count > 0 ? keptNote(k.count) : null
-    if (!f.motion && note === null) return rest
-    const l = await readLive($)
-    if (f.motion && f.animation) bandSite = { requestId: e.requestId, columns: bandColumns(e.props.bodyColumns, bandLabel(l)), live: l }
-    return drawBand($, e, l, frameMs, f.motion && f.animation, rest ?? null, { line: f.motion, note })
+    // On the main screen the printed card can't take a press, so its rows sit on the band as digit keys.
+    const t = f.card && e.viewport?.isFullscreen === false && !e.props.isWorking ? await lastTurn($, f.keep) : null
+    const reveal = t !== null && t.endedAt !== null ? { turnId: t.id, keys: revealKeys(t), show: (s: Section | 'all') => void showDetail($, t, s) } : null
+    if (note === null && reveal === null) return rest
+    return drawBand($, e, rest ?? null, { note, reveal })
   })
 
   // After a compaction the earlier rows are gone from the screen; the band points to the kept cards.
-  // While it runs, the band and spinner move: a compaction can take a minute. A precompute runs unseen and is left out.
+  // While it runs, the spinner moves and says so: a compaction can take a minute. A precompute runs unseen and is left out.
   on('session.compact', async ($, e, next) => {
     const shown = f.motion && e.agentId === undefined && e.trigger !== 'precompute'
     if (shown) {

@@ -83,7 +83,7 @@ test('main screen: /tldr show opens the whole turn as steps in order', async ($,
   expect(r.text).toContain('the whole turn "fix the login bug')
   const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-detail', viewport: MAIN, props: {} as never })
   const text = JSON.stringify(await pane.drawn())
-  for (const s of ['Steps', 'src/middleware.py', 'src/auth.py +12 −3', 'pytest tests/test_auth.py -q ✗ 3 failed', 'tests/conftest.py +2 −2', 'test file', 'Check']) expect(text).toContain(s)
+  for (const s of ['Steps', 'src/middleware.py', '"src/auth.py ",{"type":"Text","props":{"color":"success"},"children":["+12"]}', 'pytest tests/test_auth.py -q ✗ 3 failed', 'tests/conftest.py +2 −2', 'test file', 'Check']) expect(text).toContain(s)
   // In order: the failing run comes before the test-file edit, which comes before the passing run.
   const at = (s: string) => text.indexOf(s)
   expect(at('✗ 3 failed')).toBeLessThan(at('tests/conftest.py +2'))

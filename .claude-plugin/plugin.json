@@ -19,7 +19,7 @@
     "motion": {
       "type": "boolean",
       "title": "Motion",
-      "description": "The mode-aware spinner and the state band above the prompt.",
+      "description": "The mode-aware spinner: what Claude does now, and a moving frame by mode.",
       "default": true
     },
     "animation": {

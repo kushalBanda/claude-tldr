@@ -1,4 +1,5 @@
 import { expect, test } from 'claude-code/testing'
+import { countParts } from '../hooks/draw/tint'
 
 import { classify, isTestPath, patchDelta } from '../hooks/classify'
 import { detectRunner, parseResult } from '../hooks/tests-parse'
@@ -66,4 +67,10 @@ test('turn: edits to one file add up into one change', async () => {
   t = recordCall(t, 'b', [{ kind: 'change', change: { path: 'f.ts', added: 3, removed: 0, viaBash: false, isTest: false, isDelete: false, outsideRoot: false, addsSkip: false } }])
   expect(t.changes).toEqual([{ path: 'f.ts', added: 5, removed: 1, viaBash: false, isTest: false, isDelete: false, outsideRoot: false, addsSkip: false }])
   expect(t.toolUseIds).toEqual(['a', 'b'])
+})
+
+test('countParts: +N and −N words take the added and removed tones; flags and hyphens stay plain', async () => {
+  expect(countParts('src/auth.py +12 −3')).toEqual([{ text: 'src/auth.py ' }, { text: '+12', tone: 'added' }, { text: ' ' }, { text: '−3', tone: 'removed' }])
+  expect(countParts('go test -v ./pkg a+1')).toEqual([{ text: 'go test -v ./pkg a+1' }])
+  expect(countParts('+4 −0')).toEqual([{ text: '+4', tone: 'added' }, { text: ' ' }, { text: '−0', tone: 'removed' }])
 })
