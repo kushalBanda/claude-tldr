@@ -64,12 +64,12 @@ function addChange(changes: Change[], c: Change): Change[] {
 
 const LOG_MAX = 300 // lines kept per turn
 
-export function recordCall(t: Turn, toolUseId: string, calls: ClassifiedCall[], line?: string, ran?: string): Turn {
+export function recordCall(t: Turn, toolUseId: string, calls: ClassifiedCall[], lines: readonly string[] = [], ran?: string): Turn {
   let next: Turn = t.toolUseIds.includes(toolUseId) ? t : { ...t, toolUseIds: [...t.toolUseIds, toolUseId] }
-  if (line !== undefined) next = { ...next, log: [...next.log, line].slice(-LOG_MAX) }
+  if (lines.length > 0) next = { ...next, log: [...next.log, ...lines].slice(-LOG_MAX) }
   if (ran !== undefined && calls.length > 0 && calls.every(c => c.kind === 'other')) {
     next = { ...next, ran: [...(next.ran ?? []), ran].slice(-LOG_MAX) }
-    if (line !== undefined) next = { ...next, ranLog: [...(next.ranLog ?? []), line].slice(-LOG_MAX) }
+    if (lines.length > 0) next = { ...next, ranLog: [...(next.ranLog ?? []), ...lines].slice(-LOG_MAX) }
   }
   for (const c of calls) {
     if (c.kind === 'read') next = { ...next, reads: next.reads.includes(c.path) ? next.reads : [...next.reads, c.path] }

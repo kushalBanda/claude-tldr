@@ -1,7 +1,8 @@
 // Recognize test commands and read their result counts. Pure.
 
 // note: what failed when no test ran at all, as "build failed".
-export type TestCounts = { passed: number | null; failed: number | null; skipped: number | null; note?: string }
+// byLine: the counts come from counting result lines, so output cut by grep or tail undercounts them.
+export type TestCounts = { passed: number | null; failed: number | null; skipped: number | null; note?: string; byLine?: boolean }
 
 // Command start: line start or after a shell separator, with an optional runner prefix (npx, pnpm exec, ...).
 const AT = String.raw`(^|[\s;&|(])`
@@ -42,6 +43,12 @@ export function detectRunner(command: string): string | null {
   if (LIST_ONLY.test(text)) return null
   for (const [name, re] of RUNNERS) if (re.test(text)) return name
   return null
+}
+
+/** The part of a compound command that runs the tests: `rm x && go test ./... | tail -3` is `go test ./... | tail -3`. */
+export function runPart(command: string): string {
+  const parts = command.split(/\s*(?:&&|;|\|\||\n)\s*/)
+  return parts.find(p => detectRunner(p) !== null)?.trim() ?? command
 }
 
 const NONE: TestCounts = { passed: null, failed: null, skipped: null }
@@ -91,7 +98,23 @@ function go(output: string): TestCounts {
   const passed = n(/^--- PASS: /)
   const failed = n(/^--- FAIL: /)
   if (passed + failed === 0) return /\[(build|setup) failed\]/.test(output) ? { ...NONE, note: 'build failed' } : NONE
-  return { passed, failed, skipped: n(/^--- SKIP: /) }
+  return { passed, failed, skipped: n(/^--- SKIP: /), byLine: true }
+}
+
+// gotestsum: "DONE 22 tests, 1 skipped, 2 failures in 1.2s".
+function gotestsum(output: string): TestCounts {
+  const m = /DONE (\d+) tests?(?:, (\d+) skipped)?(?:, (\d+) failures?)?/.exec(output)
+  if (m === null) return NONE
+  const failed = Number(m[3] ?? 0)
+  const skipped = Number(m[2] ?? 0)
+  return { passed: Number(m[1]) - failed - skipped, failed, skipped }
+}
+
+// Last resort, for wrappers that print their own summary ("Go test: 20 passed, 2 failed in 1 packages").
+function summary(output: string): TestCounts {
+  const line = lastLine(output, l => /\b\d+ (passed|failed)\b/.test(l))
+  if (line === undefined) return NONE
+  return { passed: count(line, 'passed') ?? 0, failed: count(line, 'failed') ?? 0, skipped: count(line, 'skipped') ?? 0 }
 }
 
 // " 12 pass" / " 3 fail" / " 1 skip" lines at the end of a bun test run.
@@ -133,7 +156,16 @@ function deno(output: string): TestCounts {
   return { passed: count(line, 'passed') ?? 0, failed: count(line, 'failed') ?? 0, skipped: count(line, 'ignored') ?? 0 }
 }
 
-const PARSERS: Record<string, (output: string) => TestCounts> = { pytest, unittest, playwright, jest, vitest, 'cargo test': cargo, 'go test': go, 'bun test': bun, 'deno test': deno }
+const PARSERS: Record<string, (output: string) => TestCounts> = { pytest, unittest, playwright, jest, vitest, 'cargo test': cargo, 'go test': goAny, 'bun test': bun, 'deno test': deno }
+
+// A summary line beats counted lines: it survives `| tail`.
+function goAny(output: string): TestCounts {
+  const s = gotestsum(output)
+  if (s.passed !== null) return s
+  const g = go(output)
+  if (g.passed !== null || g.note !== undefined) return g
+  return summary(output)
+}
 
 export function parseResult(runner: string | null, output: string): TestCounts {
   const own = runner === null ? undefined : PARSERS[runner]
@@ -142,7 +174,7 @@ export function parseResult(runner: string | null, output: string): TestCounts {
     if (r.passed !== null || r.failed !== null || r.note !== undefined) return r
   }
   // A package script or task runner (npm test, make test, tox, ...) runs some runner: the first summary any of them finds.
-  for (const parse of [jest, vitest, bun, pytest, unittest, deno, cargo, go, playwright]) {
+  for (const parse of [jest, vitest, bun, pytest, unittest, deno, cargo, goAny, playwright, summary]) {
     const r = parse(output)
     if (r.passed !== null || r.failed !== null || r.note !== undefined) return r
   }

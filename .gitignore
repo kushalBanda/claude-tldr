@@ -10,3 +10,4 @@ docs/demo/*.tape
 scripts/
 .claude/
 *.local.*
+.playwright-mcp/

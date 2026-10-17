@@ -8,7 +8,7 @@ import { checkTurn } from '../hooks/trust'
 import { goalOf } from '../hooks/turn'
 import { paneRows } from '../hooks/draw/detail'
 import { turnForDuration } from '../hooks/state'
-import { groupSummary, logLine } from '../hooks/summary'
+import { groupSummary, logLine, logLines } from '../hooks/summary'
 
 // Edge cases from the 2026-10-17 probe. See docs/ADRs/0009-read-bash-statically.md.
 
@@ -147,8 +147,8 @@ test('classify: sed -n reads the file, not its line range', async () => {
   expect(classify('Bash', { command: "sed -n '1,40p' tests/b.ts" }, {}, false)).toEqual([{ kind: 'read', path: 'tests/b.ts' }])
 })
 
-test('classify: a compound search keeps only its first sub-command', async () => {
-  expect(classify('Bash', { command: 'ls ~/.claude/skills | grep -i writ; cat docs/status.md' }, {}, false)).toEqual([{ kind: 'search', pattern: 'ls ~/.claude/skills' }])
+test('classify: a compound search keeps only its first sub-command, and its read counts too', async () => {
+  expect(classify('Bash', { command: 'ls ~/.claude/skills | grep -i writ; cat docs/status.md' }, {}, false)).toEqual([{ kind: 'search', pattern: 'ls ~/.claude/skills' }, { kind: 'read', path: 'docs/status.md' }])
 })
 
 test('goal: a long prompt is cut at a word', async () => {
@@ -224,7 +224,7 @@ test('steps: reads merge, repeats stack, a test-file edit is marked', async () =
 
 test('go test: top-level tests count once, a build error says so', async () => {
   const verbose = '=== RUN   TestA\n=== RUN   TestA/sub\n    --- PASS: TestA/sub (0.00s)\n--- PASS: TestA (0.00s)\n--- FAIL: TestB (0.00s)\nFAIL\nFAIL\tatlas/pkg/fields\t0.4s'
-  expect(parseResult('go test', verbose)).toEqual({ passed: 1, failed: 1, skipped: 0 })
+  expect(parseResult('go test', verbose)).toEqual({ passed: 1, failed: 1, skipped: 0, byLine: true })
   expect(parseResult('go test', '# atlas/pkg/fields\nkind.go:24:22: syntax error\nFAIL\tatlas/pkg/fields [build failed]\nFAIL')).toEqual({ passed: null, failed: null, skipped: null, note: 'build failed' })
   expect(parseResult('make test', 'go test ./...\nFAIL\tatlas/pkg/x [setup failed]').note).toBe('build failed')
 })
@@ -258,4 +258,39 @@ test('summary: more than two edits in one group read as one count', async () => 
 test('changed pane: a big turn opens one line per folder, so it fits', async () => {
   const changes = Array.from({ length: 20 }, (_, i) => ch(`pkg/m${i % 4}/f${i}.go`, 2, 1))
   expect(paneRows({ changes, diffs: [] } as unknown as Turn, 'changed')).toBe(7)
+})
+
+test('sandbox: a test run chained with a read counts both; filtered go output drops its counts', async () => {
+  const out = (stdout: string) => ({ stdout, stderr: '' })
+  expect(classify('Bash', { command: 'go test ./pkg/fields; cat pkg/fields/kind_test.go' }, out('ok  \tatlas/pkg/fields\t0.4s'), false).map(c => c.kind)).toEqual(['test', 'read'])
+  const piped = classify('Bash', { command: 'go test -v ./pkg/fields 2>&1 | grep -E "SpanKind|^ok"' }, out('    --- PASS: TestA/x (0.00s)\n    --- PASS: TestA/y (0.00s)\n--- PASS: TestA (0.00s)\nok'), false)[0]
+  expect(piped).toMatchObject({ kind: 'test', run: { passed: null, failed: null } })
+  const failing = classify('Bash', { command: 'go test ./... | grep FAIL' }, out('--- FAIL: TestB (0.00s)\nFAIL'), true)[0]
+  expect(failing).toMatchObject({ kind: 'test', run: { failed: 1 } })
+})
+
+test('sandbox: Skill and TodoWrite count nowhere on the main screen', async () => {
+  const call = (tool: string, input: unknown) => ({ tool, input, isRunning: false, isErrored: false })
+  expect(groupSummary([call('Skill', { skill: 'golang-testing' }), call('TodoWrite', { todos: [] }), call('Read', { file_path: 'a.go' })])).toEqual(['Read a.go'])
+})
+
+test('sandbox: a compound command counts each job, and the steps show each one', async () => {
+  const out = { stdout: 'ok  \tatlas/pkg/fields\t0.4s', stderr: '' }
+  const calls = classify('Bash', { command: 'rm docs/notes/b.md && go test ./pkg/fields | tail -3' }, out, false)
+  expect(calls.map(c => c.kind)).toEqual(['test', 'change'])
+  expect(calls[1]).toMatchObject({ change: { path: 'docs/notes/b.md', isDelete: true } })
+  expect(logLines('Bash', calls, {})).toEqual(['Bash deleted docs/notes/b.md', 'Bash go test ./pkg/fields | tail -3 · ✓ ran'])
+  // A write and a read of another file in one command; a heredoc body is not a command.
+  expect(classify('Bash', { command: "cat src/a.ts > out/b.ts && head -5 'my notes.md'" }, {}, false).map(c => (c.kind === 'change' ? `w ${c.change.path}` : c.kind === 'read' ? `r ${c.path}` : c.kind))).toEqual(['w out/b.ts', 'r src/a.ts', 'r my notes.md'])
+  expect(classify('Bash', { command: "cat > a.md <<'EOF'\ncat secret.txt\nEOF" }, {}, false).map(c => c.kind)).toEqual(['change'])
+  // A failing test run still deleted what came before it.
+  expect(classify('Bash', { command: 'rm old.go && go test ./...' }, { stdout: '--- FAIL: TestA (0.00s)', stderr: '' }, true).map(c => c.kind)).toEqual(['test', 'change'])
+})
+
+test('sandbox: a failing run behind a pipe or a wrapper summary is never green', async () => {
+  const rtk = 'Go test: 20 passed, 2 failed in 1 packages\n═══\n\nfields (20 passed, 2 failed)\n  [FAIL] TestExtractSpanKind/present'
+  const r = classify('Bash', { command: 'go test ./pkg/fields 2>&1 | tail -20' }, { stdout: rtk, stderr: '' }, false)[0]
+  expect(r).toMatchObject({ kind: 'test', run: { passed: 20, failed: 2, isError: true } })
+  expect(parseResult('go test', 'okRunning: go test -json ./pkg/fields\nGo test: 22 passed in 1 packages')).toEqual({ passed: 22, failed: 0, skipped: 0 })
+  expect(parseResult('go test', 'DONE 22 tests, 1 skipped, 2 failures in 1.20s')).toEqual({ passed: 19, failed: 2, skipped: 1 })
 })

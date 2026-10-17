@@ -7,6 +7,7 @@ import { shortPath } from '../classify'
 import { byFolder, changeTotals, stepsOf, stepVerb } from '../steps'
 import type { Step } from '../steps'
 import { testLabel } from '../summary'
+import { runPart } from '../tests-parse'
 import { color, glyph } from './theme'
 
 export const DETAIL_PANE = 'tldr-detail'
@@ -133,7 +134,7 @@ export function drawDetail($: EngineInterface, e: RenderInput<'Pane'>, t: Turn |
       <Box flexDirection="column">
         {t.testRuns.map(r => {
           const l = testLabel(r)
-          return line(r.command.split('\n')[0]!, l.result, l.ok ? color.pass : color.fail)
+          return line(runPart(r.command).split('\n')[0]!, l.result, l.ok ? color.pass : color.fail)
         })}
       </Box>
     )

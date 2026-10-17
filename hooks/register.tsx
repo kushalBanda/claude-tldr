@@ -19,7 +19,7 @@ import { readFeatures } from './features'
 import { bandFrame, encodeCells, spinnerFrame } from './motion'
 import type { SpinnerMode } from './motion'
 import { allTurns, closeCurrent, durationTurn, latestTurn, loadKept, openTurn, readKept, readLive, saveKept, setKept, setLive, turnForCalls, updateCurrent, updateTurn } from './state'
-import { activityWord, logLine, runName } from './summary'
+import { activityWord, isMeta, logLines, runName } from './summary'
 import { checkTurn } from './trust'
 import { endTurn, isInterim, recordCall, recordStep, startTurn, toKept } from './turn'
 
@@ -113,12 +113,13 @@ export const register: Register = (on, options) => {
     if (e.agentId !== undefined || ran.deny !== undefined) return ran
     const root = await $.session.root().catch(() => undefined)
     const calls = classify(e.tool, e, ran.result, ran.isError === true, root)
-    const line = logLine(e.tool, calls, e)
+    const meta = isMeta(e.tool)
+    const lines = meta ? [] : logLines(e.tool, calls, e)
     const edit = f.actions ? diffOf(e.tool, e, ran.result, ran.isError === true) : null
     const diff = edit === null ? null : { ...edit, path: placePath(edit.path, root).path }
     const now = await $.clock.now()
     await updateCurrent($, t => {
-      const called = recordCall(t, e.tool_use_id, calls, line, runName(e.tool, e))
+      const called = recordCall(t, e.tool_use_id, calls, lines, meta ? undefined : runName(e.tool, e))
       const recorded = diff === null ? called : { ...called, diffs: addDiff(called.diffs, diff) }
       const done = f.trust ? { ...recorded, flags: checkTurn(recorded) } : recorded
       const c = calls[0]

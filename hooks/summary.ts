@@ -2,6 +2,7 @@
 import type { TestRun } from '../types'
 import type { ClassifiedCall } from './classify'
 import { classify, few, shortPath } from './classify'
+import { runPart } from './tests-parse'
 
 const MINUS = '−'
 
@@ -26,6 +27,27 @@ function toolName(tool: string): string {
   return m ? `${m[1]} ${m[2]}` : tool
 }
 
+// Tools that load instructions or track the plan: they run nothing, so the card counts them nowhere.
+const META = /^(Skill|ToolSearch|TodoWrite|Task(Create|Update|List|Get)|EnterPlanMode|ExitPlanMode|AskUserQuestion)$/
+
+export function isMeta(tool: string): boolean {
+  return META.test(tool)
+}
+
+/** The log lines for one finished call: one per job, so `rm x && go test` logs the delete and the test run. */
+export function logLines(tool: string, calls: ClassifiedCall[], input: unknown): string[] {
+  const jobs: ClassifiedCall[][] = [
+    calls.filter(c => c.kind === 'read'),
+    calls.filter(c => c.kind === 'search'),
+    calls.filter(c => c.kind === 'change' && !c.change.isDelete),
+    calls.filter(c => c.kind === 'change' && c.change.isDelete),
+    calls.filter(c => c.kind === 'test'),
+  ].filter(g => g.length > 0)
+  if (jobs.length <= 1) return [logLine(tool, calls, input)]
+  // Reads log one line each, as the Read tool does, so the steps merge them the same way.
+  return jobs.flatMap(g => (g[0]!.kind === 'read' ? g.map(c => logLine(tool, [c], input)) : [logLine(tool, g, input)]))
+}
+
 /** One log line for one finished call. */
 export function logLine(tool: string, calls: ClassifiedCall[], input: unknown): string {
   const c = calls[0]
@@ -35,7 +57,7 @@ export function logLine(tool: string, calls: ClassifiedCall[], input: unknown): 
   if (c.kind === 'change' && c.change.viaBash && !c.change.isDelete) return `${tool} wrote ${calls.map(x => (x.kind === 'change' ? shortPath(x.change.path) : '')).join(' ')}`
   if (c.kind === 'change')
     return c.change.isDelete ? `${tool} deleted ${calls.map(x => (x.kind === 'change' ? shortPath(x.change.path) : '')).join(' ')}` : `${tool} ${shortPath(c.change.path)} +${c.change.added} ${MINUS}${c.change.removed}`
-  if (c.kind === 'test') return `Bash ${c.run.command} · ${testLabel(c.run).result}`
+  if (c.kind === 'test') return `Bash ${runPart(c.run.command)} · ${testLabel(c.run).result}`
   const i = input !== null && typeof input === 'object' ? (input as Record<string, unknown>) : {}
   const detail = [i.command, i.description, i.url, i.query].find((v): v is string => typeof v === 'string' && v.trim() !== '') ?? ''
   return detail ? `${toolName(tool)} ${detail.split('\n')[0]!.slice(0, 100)}` : toolName(tool)
@@ -64,6 +86,7 @@ export function groupSummary(calls: readonly GroupCall[], root?: string): string
   const viaBash: string[] = []
   const tests: string[] = []
   for (const call of calls) {
+    if (isMeta(call.tool)) continue
     if (call.isRunning) {
       running++
       continue
