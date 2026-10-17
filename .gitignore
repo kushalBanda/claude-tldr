@@ -5,6 +5,7 @@ node_modules/
 
 # Internal: plans, design notes, scripts. Not part of the published mod.
 docs/plans/
+docs/ADRs/
 docs/demo/*.tape
 scripts/
 .claude/
