@@ -1,0 +1,58 @@
+{
+  "name": "tldr",
+  "version": "0.1.0",
+  "description": "TL;DR for Claude Code: every turn as one card, with what to check.",
+  "author": {
+    "name": "Kushal Banda",
+    "url": "https://github.com/kushalBanda"
+  },
+  "homepage": "https://github.com/kushalBanda/claude-tldr",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "card": {
+      "type": "boolean",
+      "title": "Turn card",
+      "description": "Fold each turn's tool calls into one card. Off: Claude Code draws its own rows, and trust, keep and actions turn off too.",
+      "default": true
+    },
+    "motion": {
+      "type": "boolean",
+      "title": "Motion",
+      "description": "The mode-aware spinner and the state band above the prompt.",
+      "default": true
+    },
+    "animation": {
+      "type": "boolean",
+      "title": "Animation",
+      "description": "Moving frames and short pulses. Off: motion keeps static colors only.",
+      "default": true
+    },
+    "trust": {
+      "type": "boolean",
+      "title": "Trust flags",
+      "description": "Flag what to check: test files changed to pass, writes outside the project, deletes, skipped tests, --no-verify or force push.",
+      "default": true
+    },
+    "keep": {
+      "type": "boolean",
+      "title": "Keep cards",
+      "description": "Save finished cards so they stay after /compact and a resume. /tldr history lists them.",
+      "default": true
+    },
+    "actions": {
+      "type": "boolean",
+      "title": "Actions",
+      "description": "/tldr copy and /tldr diff, and the same as buttons on the card.",
+      "default": true
+    }
+  },
+  "keywords": [
+    "transcript",
+    "turn card",
+    "tests",
+    "diff",
+    "compact",
+    "ui"
+  ]
+}

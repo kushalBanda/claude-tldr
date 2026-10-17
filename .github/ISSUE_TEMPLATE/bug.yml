@@ -1,0 +1,50 @@
+name: Bug
+description: The card, the spinner, the band or an action does something wrong.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected. A screenshot helps a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: The prompt or the tool calls that make it happen, if you can share them.
+  - type: input
+    id: claude-version
+    attributes:
+      label: Claude Code version
+      description: Output of `claude --version`.
+      placeholder: 2.1.302
+    validations:
+      required: true
+  - type: input
+    id: tldr-version
+    attributes:
+      label: TL;DR version
+      description: From `claude plugin list`.
+      placeholder: 0.1.0
+  - type: dropdown
+    id: layout
+    attributes:
+      label: Layout
+      options:
+        - Fullscreen
+        - Main screen (scrollback)
+        - Both
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal and OS
+      placeholder: Ghostty on macOS 15
+  - type: input
+    id: switches
+    attributes:
+      label: Switches turned off
+      description: Any of card, motion, animation, trust, keep, actions. Leave empty if all are on.

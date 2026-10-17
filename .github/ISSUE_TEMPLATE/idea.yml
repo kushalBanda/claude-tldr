@@ -1,0 +1,16 @@
+name: Idea
+description: Something the card should show, check or do.
+labels: [idea]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What is hard today, in your own words.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What the card (or a command) should do about it.
