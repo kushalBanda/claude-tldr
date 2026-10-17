@@ -7,14 +7,14 @@
 One fix in Claude Code can print a hundred lines of reads, searches, diffs and test logs. To find out what changed and whether it worked, you scroll. TL;DR folds the turn into a card and keeps every raw line one key away.
 
 ```
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ fix the login bug, users get logged out after refresh          14:02 · 52s   │
-│ Changed   src/auth.py +12 −3   src/middleware.py +4 −1   tests/conftest.py +2 −2
-│ Tests     pytest ✗ 3 failed  →  pytest ✓ 12 passed                           │
-│ Check     ⚠ tests/conftest.py changed in the turn that made tests pass       │
-│ Looked at 2 files, 1 search                              ctrl+o expand ▸     │
-│                                                             [ diff ]         │
-╰──────────────────────────────────────────────────────────────────────────────╯
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ fix the login bug, users get logged out after refresh          14:02 · 52s      │
+│ Changed   src/auth.py +12 −3   src/middleware.py +4 −1   tests/conftest.py +2 −2│
+│ Tests     pytest ✗ 3 failed  →  pytest ✓ 12 passed                              │
+│ Check     ⚠ tests/conftest.py changed in the turn that made tests pass          │
+│ Looked at 2 files, 1 search                              ctrl+o expand ▸        │
+│                                                             [ diff ]            │
+╰─────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 ## Install
