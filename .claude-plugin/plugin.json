@@ -1,6 +1,6 @@
 {
   "name": "tldr",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TL;DR for Claude Code: every turn as one card, with what to check.",
   "author": {
     "name": "Kushal Banda",

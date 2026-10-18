@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- **Click to reveal:** in fullscreen, a row's detail opens inside the card instead of a pane on the right. A click on the card no longer draws it twice.
+- **Context bar:** the conversation turns amber at 60% and red at 80%.
+
 ## 0.1.0
 
 The first release.
