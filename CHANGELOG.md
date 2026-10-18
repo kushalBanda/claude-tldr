@@ -10,7 +10,7 @@ The first release.
 - **Test parsers:** pytest, unittest, jest, vitest, Playwright, go test, gotestsum, cargo, nextest, bun and deno, also behind `npm test`, `make test`, `just test` and `tox`.
 - **Bash parsing:** one command counts every job in it: test runs, writes, deletes and reads.
 - **Motion:** a mode-aware spinner that names what Claude does now.
-- **Context bar:** a bar above the prompt shows how full the context window is: the conversation (what `/compact` frees) in blue, the setup in gray, and the room left. The label names each color and warns at 75% and 90%. `/tldr context` or key 7 explains each part.
+- **Context bar:** a bar above the prompt shows how full the context window is: the conversation (what `/compact` frees) in blue, the setup in gray, and the room left. The label names each color and warns at 75% and 90%. A click on its label or `/tldr context` explains each part.
 - **So far line:** while a turn runs, one line above the prompt shows its calls, files, test runs and current job.
 - **Main-screen keys:** on the main screen, the band above the prompt holds the rows of the latest card as digit keys.
 - **Kept cards:** cards stay after `/compact` and a resume. `/tldr history` lists them.

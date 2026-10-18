@@ -50,7 +50,7 @@ test('band: the bar and its label draw after a measure, and 7 opens the context 
   await $.command.run({ command: 'tldr', args: 'context', origin: { kind: 'composer' } } as never)
   const ui = await $.ui.mount(band)
   const text = JSON.stringify(await ui.drawn())
-  for (const s of ['tldr-context-bar', '62% full', 'conversation 97k', 'setup 27k', '"color":"#636efa"', '"hotkey":"7"', 'engine band']) expect(text).toContain(s)
+  for (const s of ['tldr-context-bar', '62% full', 'conversation 97k', 'setup 27k', '"color":"#636efa"', 'engine band']) expect(text).toContain(s)
   await ui.press({ key: 'tldr-context-open' })
   expect(opened).toEqual(['tldr-context', 'tldr-context'])
   const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-context', viewport: MAIN, props: {} as never })

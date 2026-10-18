@@ -36,7 +36,6 @@ export type BandContext = { fill: ContextFill; open: () => void }
 export type BandParts = { note: string | null; reveal: BandReveal | null; context: BandContext | null; progress: ProgressPart[] | null }
 
 export const CONTEXT_KEY = 'tldr-context-bar'
-const CONTEXT_HOTKEY = '7'
 
 export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest: RenderElement | null, parts: BandParts) {
   const { Box, Text, Button, Raster } = $.ui.resolve(e as RenderInput<'AbovePrompt', 'terminal'>)
@@ -49,8 +48,8 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest
   const setup = ctx !== null ? `setup ${tokens(sliceTokens(ctx.fill, 'setup'))}` : ''
   const wide = e.props.bodyColumns >= 72
   const labelLength = head.length + (wide ? conv.length + setup.length + 6 : 0)
-  // The label and its hotkey ("7: ") take their own cells; the bar takes the rest.
-  const barColumns = Math.max(4, e.props.bodyColumns - labelLength - 4)
+  // The label takes its own cells, one more for the gap; the bar takes the rest.
+  const barColumns = Math.max(4, e.props.bodyColumns - labelLength - 1)
   return (
     <Box key="tldr-bands" flexDirection="column">
       {rest}
@@ -79,7 +78,7 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest
       {ctx !== null ? (
         <Box key="tldr-context-row" flexDirection="row" columnGap={1}>
           <Raster key={CONTEXT_KEY} columns={barColumns} rows={1} cells={encodeCells(contextCells(ctx.fill, barColumns))} />
-          <Button key="tldr-context-open" hotkey={CONTEXT_HOTKEY} plain onPress={ctx.open}>
+          <Button key="tldr-context-open" plain onPress={ctx.open}>
             <Text color={level === 'full' ? color.fail : level === 'warn' ? color.check : color.text}>{head}</Text>
             {wide ? <Text color={color.dim}>{' · '}</Text> : null}
             {wide ? <Text color={hex(CONVERSATION_RGB)}>{conv}</Text> : null}
