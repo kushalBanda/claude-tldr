@@ -114,6 +114,11 @@ export async function saveKept($: EngineInterface, t: Turn): Promise<number> {
   return next.length
 }
 
+/** A restarted session (a resume, a /tui switch) starts with no turns in memory: the kept cards stand in, so its old rows draw cards again. */
+export async function seedTurns($: EngineInterface, list: readonly Turn[]): Promise<void> {
+  await update($, turns, now => ((now ?? []).length > 0 ? now ?? [] : list.slice(-MAX_TURNS)))
+}
+
 export async function readKept($: EngineInterface): Promise<Kept> {
   return read($, kept)
 }

@@ -22,7 +22,7 @@ import { drawSpinner, SPINNER_KEY } from './draw/spinner'
 import { readFeatures } from './features'
 import { encodeCells, spinnerFrame } from './motion'
 import type { SpinnerMode } from './motion'
-import { allTurns, closeCurrent, durationTurn, latestTurn, loadKept, openTurn, readKept, readLive, saveKept, setKept, setLive, turnForCalls, updateCurrent, updateTurn } from './state'
+import { allTurns, closeCurrent, durationTurn, latestTurn, loadKept, openTurn, readKept, readLive, saveKept, seedTurns, setKept, setLive, turnForCalls, updateCurrent, updateTurn } from './state'
 import { activityWord, isMeta, logLines, runName } from './summary'
 import { checkTurn } from './trust'
 import { endTurn, isInterim, recordCall, recordStep, startTurn, toKept } from './turn'
@@ -74,10 +74,13 @@ export const register: Register = (on, options) => {
       .register({ name: 'tldr', description: 'TL;DR for Claude Code: turn cards', argumentHint: '[show|context|history|copy|diff]' })
       .catch(() => {})
     if (f.context) await measureContext($)
-    // A resumed session: its earlier cards are on disk, its earlier rows are not on screen.
+    // A resumed session: its earlier cards are on disk. They also stand in for the turns, so rows redrawn after a restart find their card.
     if (f.keep) {
       const list = await loadKept($).catch(() => [])
-      if (list.length > 0) await setKept($, () => ({ count: list.length, note: true })).catch(() => {})
+      if (list.length > 0) {
+        await seedTurns($, list).catch(() => {})
+        await setKept($, () => ({ count: list.length, note: true })).catch(() => {})
+      }
     }
     return r
   })

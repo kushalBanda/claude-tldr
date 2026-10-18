@@ -70,7 +70,7 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest
       ) : null}
       {reveal !== null ? (
         <Box key="tldr-reveal" flexDirection="row" columnGap={2}>
-          <Text color={color.dim}>TL;DR</Text>
+          <Text color={color.dim}>TL;DR open</Text>
           {reveal.keys.map(k => (
             <Button key={`tldr-reveal:${k.section}:${reveal.turnId}`} label={k.label} hotkey={k.hotkey} plain dimColor onPress={() => reveal.show(k.section)} />
           ))}

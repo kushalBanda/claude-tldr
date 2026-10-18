@@ -76,3 +76,18 @@ test('/tldr history opens the pane, and the pane lists the kept cards', async ($
   expect(text).toContain('pytest ✓ 12 passed')
   expect(text).toContain('⚠ tests/conftest.py changed in the turn that made tests pass')
 })
+
+test('a resumed session draws its old rows as cards again, from the kept cards', async ($, on) => {
+  engine(on)
+  host(on, { 'cards:sess-1': [toKept({ ...startTurn('old-1', 'earlier work', 0), endedAt: 1000, toolUseIds: ['tu-old'] })] })
+  on('ui.render', { component: 'ToolGroup' }, async ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine rows</Text>
+  })
+  await $.session.start({ source: 'resume', cwd: '/repo' } as never)
+  const call = { tool_use_id: 'tu-old', tool: 'Read', input: {}, isRunning: false, isErrored: false, isInterrupted: false }
+  const site = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'ToolGroup', requestId: 'group-old', viewport: FULL, props: { calls: [call], isActive: false, isExpanded: false } } as never)
+  const text = JSON.stringify(await site.drawn())
+  expect(text).toContain('earlier work')
+  expect(text).not.toContain('engine rows')
+})

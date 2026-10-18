@@ -59,7 +59,7 @@ test('main screen: the full card takes the place of the closing line', async ($,
     props: { word: 'Baked', durationMs: 52_000 },
   })
   const text = JSON.stringify(await ui.drawn())
-  for (const s of ['fix the login bug', '52s', 'src/auth.py', '"✓ 12 passed"', '/tldr show']) expect(text).toContain(s)
+  for (const s of ['fix the login bug', '52s', 'src/auth.py', '"✓ 12 passed"', 'type its key at the empty prompt']) expect(text).toContain(s)
   expect(text).not.toContain('Baked for 52s')
 })
 
