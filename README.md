@@ -21,6 +21,8 @@ In a Claude Code terminal session, type:
 
 Answer `y` to add the marketplace, then pick a scope (user is the first one). The mod starts at once, with no restart. It needs Claude Code 2.1.301 or later.
 
+Also listed on [claudecodemods.com](https://claudecodemods.com/extensions/claude-tldr), [claudemods.dev](https://claudemods.dev/en/builds/tldr-825fdb) and [claudemods.si](https://claudemods.si/mods/tldr-kushalbanda).
+
 ## Features
 
 ![A card with an amber border lists four checks: a write outside the project, a deleted file, an added skip marker, and skipped hooks with a force push.](.github/assets/trust.png)
