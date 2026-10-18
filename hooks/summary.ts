@@ -166,5 +166,6 @@ export function activityWord(tool: string, input: unknown): string {
     const first = i.command.trim().split('\n')[0]!
     return `Running ${first.length > 40 ? `${first.slice(0, 39)}…` : first}`
   }
-  return `Using ${tool}`
+  // An MCP tool reads in words: mcp__playwright__browser_take_screenshot is "Using playwright browser take screenshot".
+  return `Using ${toolName(tool).replace(/_/g, ' ')}`
 }

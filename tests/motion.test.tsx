@@ -45,6 +45,7 @@ test('activity words name what Claude does', async () => {
   expect(activityWord('Edit', { file_path: 'a.ts' })).toBe('Editing a.ts')
   expect(activityWord('Bash', { command: 'pytest -q\necho done' })).toBe('Running pytest -q')
   expect(activityWord('WebFetch', {})).toBe('Using WebFetch')
+  expect(activityWord('mcp__playwright__browser_take_screenshot', {})).toBe('Using playwright browser take screenshot')
 })
 
 test('spinner: a Raster plus what Claude does now, while a call runs', async ($, on) => {

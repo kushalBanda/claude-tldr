@@ -1,4 +1,4 @@
-// The band above the prompt: the "so far" line while a turn runs, the context bar, the kept-cards note after /compact, and on the main screen the rows of the latest card as keys.
+// The band above the prompt: the TL;DR line while a turn runs, the context bar, the kept-cards note after /compact, and on the main screen the rows of the latest card as keys.
 import type { EngineInterface, RenderElement, RenderInput } from 'claude-code'
 
 import type { Turn } from '../../types'
@@ -57,7 +57,7 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest
       {parts.note !== null ? <Text key="tldr-kept-note" color={color.dim} wrap="truncate-end">{parts.note}</Text> : null}
       {parts.progress !== null && parts.progress.length > 0 ? (
         <Text key="tldr-progress" wrap="truncate-end">
-          <Text color={color.label}>{'so far  '}</Text>
+          <Text bold>{'TL;DR  '}</Text>
           {parts.progress.map((p, i) => (
             <Text color={color.dim}>
               {i > 0 ? ' · ' : ''}

@@ -1,4 +1,4 @@
-// The "so far" line on the band while a turn runs: the card's facts in one line, so a long turn shows how far it got. Pure.
+// The TL;DR line on the band while a turn runs: the card's facts in one line, so a long turn shows how far it got. Pure.
 import type { Turn } from '../types'
 import { changeTotals } from './steps'
 import { testLabel } from './summary'
@@ -30,7 +30,7 @@ export function progressParts(t: Pick<Turn, 'toolUseIds' | 'changes' | 'testRuns
 }
 
 /** The parts that fit `columns` beside the label: drop calls, then files; tests and now stay (the row truncates). */
-export function fitProgress(parts: readonly ProgressPart[], columns: number, label = 'so far'): ProgressPart[] {
+export function fitProgress(parts: readonly ProgressPart[], columns: number, label = 'TL;DR'): ProgressPart[] {
   const width = (ps: readonly ProgressPart[]) => label.length + 2 + ps.reduce((n, p) => n + p.text.length + 3, 0)
   let out = [...parts]
   for (const drop of ['calls', 'files'] as const) {

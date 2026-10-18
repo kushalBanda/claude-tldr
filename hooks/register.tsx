@@ -107,7 +107,7 @@ export const register: Register = (on, options) => {
     if (e.agentId === undefined) {
       await updateCurrent($, t => recordCall(t, e.tool_use_id, [])).catch(() => {})
       if (f.motion) await setLive($, l => ({ ...l, word: activityWord(e.tool, e) })).catch(() => {})
-      // The band's "so far" line names the new job.
+      // The band's TL;DR line names the new job.
       if (f.motion) $.ui.invalidate('ui.render')
       const path = editPath(e.tool, e)
       if (f.actions && path !== undefined && !befores.has(path)) {
@@ -134,7 +134,7 @@ export const register: Register = (on, options) => {
       if (c?.kind === 'test') return { ...done, pulse: { kind: 'test', key: String(done.testRuns.length - 1), at: now } }
       return done
     }).catch(() => {})
-    // The band's "so far" line counts the finished call.
+    // The band's TL;DR line counts the finished call.
     if (f.motion) $.ui.invalidate('ui.render')
     // The flash ends on the next draw after it runs out.
     if (f.motion && f.animation && (calls[0]?.kind === 'change' || calls.some(c => c.kind === 'test'))) $.clock.after(PULSE_MS + 50, () => $.ui.invalidate('ui.render'))

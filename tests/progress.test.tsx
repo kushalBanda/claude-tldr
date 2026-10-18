@@ -1,4 +1,4 @@
-// The "so far" line: while a long turn runs, the band says how far it got, in the card's own words.
+// The TL;DR line: while a long turn runs, the band says how far it got, in the card's own words.
 import { expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
@@ -27,23 +27,23 @@ test('fit: a narrow band drops calls, then files; tests and the current job stay
   expect(fitProgress(parts, 40).map(p => p.key)).toEqual(['tests', 'now'])
 })
 
-test('band: while the turn runs, the so far line shows its facts; when it ends, the line goes', async ($, on) => {
+test('band: while the turn runs, the TL;DR line shows its facts; when it ends, the line goes', async ($, on) => {
   engine(on)
   base(on)
   await $.turn.start({ turnId: 'turn-login', text: 'fix the login bug' } as never)
   await $.tool.call({ tool: 'Edit', file_path: 'src/auth.py', old_string: 'a', new_string: 'b', tool_use_id: 'w1' } as never)
   await $.tool.call({ tool: 'Bash', command: 'pytest -q', tool_use_id: 'w2' } as never)
   const text = JSON.stringify(await (await $.ui.mount(working(true))).drawn())
-  for (const s of ['so far', '2 calls', '"1 file "', '"+12"', 'pytest ✗ 3 failed', 'now: running pytest -q']) expect(text).toContain(s)
+  for (const s of ['TL;DR  ', '2 calls', '"1 file "', '"+12"', 'pytest ✗ 3 failed', 'now: running pytest -q']) expect(text).toContain(s)
   await $.turn.complete({ turnId: 'turn-login', answer: 'done' } as never)
-  expect(JSON.stringify(await (await $.ui.mount(working(false))).drawn())).not.toContain('so far')
+  expect(JSON.stringify(await (await $.ui.mount(working(false))).drawn())).not.toContain('TL;DR  ')
 })
 
-test('motion off: no so far line', { options: { motion: false } }, async ($, on) => {
+test('motion off: no TL;DR line', { options: { motion: false } }, async ($, on) => {
   engine(on)
   base(on)
   await $.turn.start({ turnId: 'turn-login', text: 'fix the login bug' } as never)
   await $.tool.call({ tool: 'Edit', file_path: 'src/auth.py', old_string: 'a', new_string: 'b', tool_use_id: 'w1' } as never)
-  expect(JSON.stringify(await (await $.ui.mount(working(true))).drawn())).not.toContain('so far')
+  expect(JSON.stringify(await (await $.ui.mount(working(true))).drawn())).not.toContain('TL;DR  ')
   void play
 })
