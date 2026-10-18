@@ -103,9 +103,9 @@ pytest, unittest, jest, vitest, Playwright, go test, gotestsum, cargo test and n
 <details>
 <summary><b>Develop</b></summary>
 
+Clone the repository, and in its folder:
+
 ```bash
-git clone https://github.com/kushalBanda/claude-tldr
-cd claude-tldr
 claude --plugin-dir .          # run it; a save reloads the mod
 claude plugin validate .       # manifest, marketplace and hooks
 claude plugin test .           # the test suite (tests/*.test.ts*)

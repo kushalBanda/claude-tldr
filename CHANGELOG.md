@@ -3,7 +3,7 @@
 ## 0.1.3
 
 - **Directory ready:** every function that takes `$` lives in the hooks module, so the Claude directory can read the mod's calls. The draw modules take the resolved elements. No change in what the mod does.
-- **Icon:** a square icon at `.claude-plugin/icon.png`, and a display name, TL;DR for Claude Code.
+- **Icon:** a square listing icon, and a display name, TL;DR for Claude Code.
 
 ## 0.1.2
 
