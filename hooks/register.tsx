@@ -3,13 +3,13 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderInput, RenderSurface, Timer } from 'claude-code'
 
-import type { Kept, Live, Turn } from '../types'
+import type { Kept, Live, Plan, Turn } from '../types'
 
 import { addDiff, cleanCopy, diffOf, mergeNet, turnDiff } from './actions'
 import { classify, placePath } from './classify'
 import { unifiedDiff } from './netdiff'
 import { drawCard, PULSE_MS } from './draw/card'
-import { drawBand, keptNote, revealKeys } from './draw/band'
+import { drawBand, keptNote, PLAN_BAR_KEY, PLAN_ROW_KEY, revealKeys } from './draw/band'
 import { CONTEXT_PANE, drawContextPane } from './draw/context'
 import { contextFill } from './context'
 import { fitProgress, progressParts } from './progress'
@@ -21,7 +21,8 @@ import { DIFF_PANE, drawDiff } from './draw/diff'
 import { drawHistory, HISTORY_PANE } from './draw/history'
 import { drawSpinner, SPINNER_KEY } from './draw/spinner'
 import { readFeatures } from './features'
-import { encodeCells, spinnerFrame } from './motion'
+import { encodeCells, fitsCells, planBarFrame, shimmerRowFrame, spinnerFrame } from './motion'
+import { applyTaskCall, EMPTY_PLAN, planView, TASK_TOOLS, taskLabel } from './plan'
 import type { SpinnerMode } from './motion'
 import { isTurnList, KEPT_MAX, keptKey, MAX_TURNS, turnForCalls, turnForDuration } from './state'
 import { activityWord, isMeta, logLines, runName } from './summary'
@@ -35,6 +36,9 @@ const FRAME_MS = 80
 let frameMs = 0
 let loop: Timer | undefined
 let spinnerSite: { requestId: string; mode: SpinnerMode } | null = null
+// The band's stepper as last drawn, for the loop to repaint its bar and running row; doneFrame is when the last task was done.
+let planSite: { requestId: string; done: number; total: number; barColumns: number; row: string | null; rowColumns: number } | null = null
+let doneFrame = -Infinity
 // The turn the diff pane shows: the card whose diff button was pressed last.
 let diffFor: string | null = null
 // What the detail pane shows: the turn and the row pressed last (or /tldr show).
@@ -59,6 +63,13 @@ function startLoop($: EngineInterface) {
       void $.ui.blit({ requestId: spin.requestId, key: SPINNER_KEY, cells: encodeCells(spinnerFrame(spin.mode, frameMs)) })
         .then(r => { if (r.deny !== undefined && spinnerSite === spin) spinnerSite = null })
         .catch(() => {})
+    const p = planSite
+    if (p !== null) {
+      void $.ui.blit({ requestId: p.requestId, key: PLAN_BAR_KEY, cells: encodeCells(planBarFrame(p.done, p.total, frameMs - doneFrame, frameMs, p.barColumns)) })
+        .then(r => { if (r.deny !== undefined && planSite === p) planSite = null })
+        .catch(() => {})
+      if (p.row !== null) void $.ui.blit({ requestId: p.requestId, key: PLAN_ROW_KEY, cells: encodeCells(shimmerRowFrame(p.row, frameMs, p.rowColumns)) }).catch(() => {})
+    }
   })
 }
 
@@ -66,6 +77,7 @@ function endLoop() {
   loop?.cancel()
   loop = undefined
   spinnerSite = null
+  planSite = null
 }
 
 export const register: Register = (on, options) => {
@@ -121,6 +133,20 @@ export const register: Register = (on, options) => {
     }
     const ran = await next(e)
     if (e.agentId !== undefined || ran.deny !== undefined) return ran
+    // Claude's own task list feeds the band's stepper.
+    if (f.card && f.motion && TASK_TOOLS.includes(e.tool) && ran.isError !== true && openTurnId !== null) {
+      const before = await readPlan($)
+      const after = applyTaskCall(before, e.tool, e, ran.result, openTurnId, await $.clock.now())
+      if (after !== before) {
+        await setPlan($, () => after).catch(() => {})
+        if (after.done !== before.done) {
+          doneFrame = frameMs
+          // The done task's highlight ends on the next draw after it runs out.
+          $.clock.after(PULSE_MS + 50, () => $.ui.invalidate('ui.render'))
+        }
+        $.ui.invalidate('ui.render')
+      }
+    }
     const root = await $.session.root().catch(() => undefined)
     const calls = classify(e.tool, e, ran.result, ran.isError === true, root)
     const meta = isMeta(e.tool)
@@ -297,8 +323,10 @@ export const register: Register = (on, options) => {
     // While a turn runs: how far it got, in one line, redrawn as calls land (no timer).
     const open = f.card && f.motion && e.props.isWorking ? await latestTurn($) : null
     const progress = open !== null && open.endedAt === null ? fitProgress(progressParts(open, (await readLive($)).word), e.props.bodyColumns) : null
-    if (note === null && reveal === null && context === null && (progress === null || progress.length === 0)) return rest
-    return drawBand($.ui.resolve(e as RenderInput<'AbovePrompt', 'terminal'>), e, rest ?? null, { note, reveal, context, progress })
+    const plan = open !== null && open.endedAt === null ? await planParts($, e.requestId, open.id, e.props.bodyColumns, f.animation) : null
+    if (plan === null && planSite?.requestId === e.requestId) planSite = null
+    if (note === null && reveal === null && context === null && plan === null && (progress === null || progress.length === 0)) return rest
+    return drawBand($.ui.resolve(e as RenderInput<'AbovePrompt', 'terminal'>), e, rest ?? null, { note, reveal, context, progress, plan })
   })
 
   // After a compaction the earlier rows are gone from the screen; the band points to the kept cards.
@@ -339,6 +367,29 @@ export const register: Register = (on, options) => {
     return drawCard($.ui.resolve(e), e, t, { isExpanded: false, durationMs: e.props.durationMs })
   })
 
+}
+
+/** The stepper's first frame, and the site the frame loop repaints; null when the open turn has no task list. */
+async function planParts($: EngineInterface, requestId: string, turnId: string, bodyColumns: number, animation: boolean) {
+  const plan = await readPlan($)
+  const view = planView(plan, turnId)
+  if (view === null) return null
+  // With animation off nothing repaints: the bar holds still and the running task is plain text.
+  const moving = animation && loop !== undefined
+  const barColumns = Math.max(10, Math.min(24, Math.floor(bodyColumns / 5)))
+  const label = view.current !== null ? taskLabel(view.current) : null
+  const row = moving && label !== null && fitsCells(label) ? label : null
+  const rowColumns = row === null ? 0 : Math.max(1, Math.min(bodyColumns, [...row].length + 4))
+  planSite = moving ? { requestId, done: view.done, total: view.total, barColumns, row, rowColumns } : null
+  const now = await $.clock.now()
+  return {
+    view,
+    barCells: encodeCells(planBarFrame(view.done, view.total, frameMs - doneFrame, frameMs, barColumns, moving)),
+    barColumns,
+    rowCells: row === null ? null : encodeCells(shimmerRowFrame(row, frameMs, rowColumns, moving)),
+    rowColumns,
+    justDone: plan.done !== null && now - plan.done.at < PULSE_MS ? plan.done.id : null,
+  }
 }
 
 /** The newest turn in this session; after a resume, the newest kept card. */
@@ -434,6 +485,15 @@ const turns = atom({ plugin: 'tldr', key: 'turns' } as const, [] as Turn[])
 const live = atom({ plugin: 'tldr', key: 'live' } as const, { phase: 'idle', word: '' } as Live)
 const kept = atom({ plugin: 'tldr', key: 'kept' } as const, { count: 0, note: false } as Kept)
 const current = atom({ plugin: 'tldr', key: 'current' } as const, null as string | null)
+const planAtom = atom({ plugin: 'tldr', key: 'plan' } as const, EMPTY_PLAN as Plan)
+
+async function readPlan($: EngineInterface): Promise<Plan> {
+  return read($, planAtom)
+}
+
+async function setPlan($: EngineInterface, fn: (p: Plan) => Plan): Promise<void> {
+  await update($, planAtom, p => fn(p ?? EMPTY_PLAN))
+}
 
 async function openTurn($: EngineInterface, t: Turn): Promise<void> {
   // A turn that never completed (interrupted) ends where the next one starts, so its card stops saying "running".
