@@ -1,17 +1,15 @@
 # TL;DR for Claude Code
 
-**Every turn, in one card.** It shows the files Claude changed, the tests before and after, what Claude looked at, and what to check before you trust the result.
+**Every turn, in one card.** What changed, how the tests went, and what to check before you trust it.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)
+![Version](https://img.shields.io/badge/version-0.1.2-orange.svg)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-2.1.301%2B-d77757.svg)
 ![No network calls](https://img.shields.io/badge/network%20calls-none-success.svg)
 
 ![Left: a Claude Code turn as 33 lines of reads, edits and test logs. Right: the same turn as one TL;DR card that flags the changed test file, and the steps pane under it.](.github/assets/before-after.png)
 
-One fix in Claude Code can print a hundred lines of reads, searches, diffs and test logs. To find out what changed and if it worked, you scroll. **TL;DR** folds the turn into one card. Every raw line stays one click away.
-
-Look at the image above. Claude edited `tests/conftest.py` in the same turn that made the tests pass. In the plain transcript, that edit is line 28 of 33. On the card, it is the amber **Check** row.
+![33 lines become 5 rows. A Check row flags edits that can fake a green run. No network calls.](.github/assets/value.png)
 
 ## Install
 
@@ -23,28 +21,26 @@ In a Claude Code terminal session, type:
 
 Answer `y` to add the marketplace, then pick a scope (user is the first one). The mod starts at once, with no restart. It needs Claude Code 2.1.301 or later.
 
-## What you get
+## Features
 
-- **Turn card:** one card per turn in place of the tool rows. It shows the goal, the time, the size of the turn (`3 files +18 −6`) and its files, the test runs in order, the other commands in one Ran row (`git ×3 · gh`), and what Claude read and searched. The text Claude writes between tool calls folds into the card. The final reply stays.
-- **Trust flags:** the card turns amber and says what to check: a test file changed in the turn that made tests pass, a write outside the project, a deleted file, an added skip, only or xfail marker, `--no-verify`, or a force push.
-- **Click to reveal:** click a row and what is behind it opens inside the card. Click the goal for the turn as steps. Click again to close.
-- **Context bar:** one line above the prompt shows how full the context window is, in two colors: blue for the conversation, which `/compact` frees, and gray for the setup (system prompt, tools, memory, skills), which every request loads. The label names each color: `62% full · conversation 94k · setup 30k`. The percent and the conversation turn amber at 60% and red at 80%, and then it points to `/compact`. You decide when to compact. Click the label (fullscreen) or run `/tldr context` for the setup rows and what each part means.
-- **Motion:** a spinner that shows the mode (thinking, running tools, writing) and the current job (`Reading src/auth.py`). It also moves during `/compact`. While a turn runs, a TL;DR line above the prompt shows how far it got: `TL;DR  14 calls · 3 files +40 −6 · pytest ✗ 3 failed → ✓ 12 passed · now: running pytest`. It redraws only when a call starts or ends, and it goes away when the card takes over.
-- **Kept cards:** each finished card is saved for the session. After `/compact` or a resume, `/tldr history` shows the earlier turns.
-- **Actions:** copy the reply as clean text, or see the net diff of the turn.
+![A card with an amber border lists four checks: a write outside the project, a deleted file, an added skip marker, and skipped hooks with a force push.](.github/assets/trust.png)
 
-### See how the tests went green
+![The Changed row is open inside the card: files grouped by folder, with the first diff lines of auth.py.](.github/assets/reveal.png)
 
-Click the goal line. The card lists every step in order, so you see the test file edit between the red run and the green run. The lower window in the image above shows it.
+![A spinner reads "Running pytest", and one TL;DR line above the prompt shows files, the red-to-green test runs and the current job.](.github/assets/progress.png)
 
-### Both layouts
+![Three context bars: 38% full in blue, 62% full in amber, and 86% full in red with a pointer to /compact.](.github/assets/context.png)
 
-- **Fullscreen:** the card takes the place of the tool rows and updates live. Click a row (Changed, Tests, Check, Ran, Looked at) to open its detail inside the card; click it again to close. Changed groups files by folder and shows the first diff lines.
-- **Main screen (scrollback):** printed rows can't change. So each tool group becomes one summary line, and the full card prints where Claude Code's closing line ("Baked for 52s") was. Printed rows can't take a click, so the band above the prompt holds the rows of the latest card as keys: `TL;DR  1 steps  2 changed  3 tests  4 check  5 ran  6 looked at`. Type the digit into the empty prompt and pause, and that row's detail opens on the band, under the keys. The same digit again closes it. `/tldr show` opens it in a pane.
+![On the main screen, the band above the prompt shows the rows as digit keys. Key 3 opens the test runs under it.](.github/assets/band.png)
 
-On desktop and in VS Code, Claude Code draws its own rows. The card is for the terminal.
+![The /tldr history pane lists two kept cards, newest first.](.github/assets/history.png)
 
-## Commands
+Also: `/tldr copy` copies the reply as clean text, and `/tldr diff` prints the net diff of the turn. On desktop and in VS Code, Claude Code draws its own rows. The card is for the terminal.
+
+## Reference
+
+<details>
+<summary><b>Commands</b></summary>
 
 | Command | Does |
 | --- | --- |
@@ -55,7 +51,10 @@ On desktop and in VS Code, Claude Code draws its own rows. The card is for the t
 | `/tldr copy` | Copy the latest reply as clean text: no trailing spaces, no shared indentation. |
 | `/tldr diff` | Print the net change of the latest turn per file, as a unified diff. |
 
-## Switches
+</details>
+
+<details>
+<summary><b>Switches</b></summary>
 
 Every feature is a switch, and all are on by default. Change them with `/plugin configure tldr@claude-tldr` in Claude Code.
 
@@ -69,17 +68,26 @@ Every feature is a switch, and all are on by default. Change them with `/plugin 
 | `keep` | Nothing saved, no note after `/compact`. |
 | `actions` | No buttons, no copy or diff commands. |
 
-## Tests it reads
+</details>
+
+<details>
+<summary><b>Tests it reads</b></summary>
 
 pytest, unittest, jest, vitest, Playwright, go test, gotestsum, cargo test and nextest, bun test, and deno test. It also reads `npm`, `pnpm` and `yarn test`, `make test`, `just test` and `tox`: it finds the summary of the runner they start. For `go test`, counts need `-v`, and a compile error reads `✗ build failed`. Runs that only list tests (`--collect-only`, `--listTests`) don't count.
 
-## Privacy and trust
+</details>
+
+<details>
+<summary><b>Privacy and trust</b></summary>
 
 - **No network.** TL;DR makes no network calls and starts no processes.
 - **Local only.** It reads the tool calls and results of your session, and the files Claude edits, to build the net diff. The context bar uses Claude Code's local estimate of the window, so it sends no request. Kept cards stay in Claude Code's local plugin store: one list per session, at most 50 cards, without diff bodies.
 - **Check it yourself.** Before you install, run `claude plugin validate` on a clone. The `hooks:` and `calls:` lines list every event the mod handles and every API it calls.
 
-## Limits
+</details>
+
+<details>
+<summary><b>Limits</b></summary>
 
 - Changes made through Bash count when they use a redirect, a heredoc, `tee`, `sed -i`, `perl -i`, `cp`, `mv`, `touch`, `git checkout -- path` or `git restore`. They show as `path via Bash`, without line counts. Writes from scripts (`python x.py`), `git apply` and `git stash pop` don't show. A path built from a variable (`> $OUT`) is left out.
 - A `cd` counts inside one command (`cd app && touch x`), but not when it ran in an earlier call.
@@ -89,7 +97,10 @@ pytest, unittest, jest, vitest, Playwright, go test, gotestsum, cargo test and n
 - The custom spinner takes the place of Claude Code's spinner line, so the token count doesn't show. Switch `motion` off to get it back.
 - If Claude writes the same text twice in one turn, as a note and as the reply, it can fold away with the note. `/tldr show notes` brings it back.
 
-## Develop
+</details>
+
+<details>
+<summary><b>Develop</b></summary>
 
 ```bash
 git clone https://github.com/kushalBanda/claude-tldr && cd claude-tldr
@@ -100,7 +111,9 @@ claude plugin test .           # the test suite (tests/*.test.ts*)
 
 The mod is TypeScript with no dependencies. Render hooks are pure, and all parsing is static: TL;DR never runs a command to learn what a command did. See [CONTRIBUTING.md](CONTRIBUTING.md) to send a change.
 
-The cards in this README are the mod's real output for the test fixture in `tests/fixtures/login-bug.ts`, drawn by the test kit. The plain Claude Code panel beside it is a mock-up of the same turn.
+The images in this README are mock-ups of the mod's output.
+
+</details>
 
 ## Contributing
 
