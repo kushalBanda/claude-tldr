@@ -3,7 +3,7 @@
 **Every turn, in one card.** What changed, how the tests went, and what to check before you trust it.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.1.3-orange.svg)
+![Version](https://img.shields.io/badge/version-0.1.4-orange.svg)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-2.1.301%2B-d77757.svg)
 ![No network calls](https://img.shields.io/badge/network%20calls-none-success.svg)
 

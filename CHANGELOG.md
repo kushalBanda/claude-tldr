@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4
+
+- **Task stepper:** when Claude writes a task list (`TaskCreate` and `TaskUpdate`, or `TodoWrite`), the band above the prompt shows it while the turn runs: a bar filled by tasks done, the count, and up to five tasks. Done tasks tick off, the running one names what Claude does now with a sweep of light, the rest wait dim. With no list, the TL;DR line stays as before. Behind `motion`; `animation` off holds it still.
+
 ## 0.1.3
 
 - **Directory ready:** every function that takes `$` lives in the hooks module, so the Claude directory can read the mod's calls. The draw modules take the resolved elements. No change in what the mod does.
