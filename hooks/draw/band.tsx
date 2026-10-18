@@ -4,7 +4,7 @@ import type { EngineInterface, RenderElement, RenderInput } from 'claude-code'
 import type { Turn } from '../../types'
 import { contextCells, contextLevel, hex, sliceTokens, tokens } from '../context'
 import type { ContextFill } from '../context'
-import { CONVERSATION_RGB, SETUP_RGB } from '../context'
+import { conversationRgb, SETUP_RGB } from '../context'
 import { encodeCells } from '../motion'
 import type { ProgressPart } from '../progress'
 import { countParts } from './tint'
@@ -81,7 +81,7 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest
           <Button key="tldr-context-open" plain onPress={ctx.open}>
             <Text color={level === 'full' ? color.fail : level === 'warn' ? color.check : color.text}>{head}</Text>
             {wide ? <Text color={color.dim}>{' · '}</Text> : null}
-            {wide ? <Text color={hex(CONVERSATION_RGB)}>{conv}</Text> : null}
+            {wide ? <Text color={hex(conversationRgb(ctx.fill.percent))}>{conv}</Text> : null}
             {wide ? <Text color={color.dim}>{' · '}</Text> : null}
             {wide ? <Text color={hex(SETUP_RGB)}>{setup}</Text> : null}
           </Button>

@@ -10,6 +10,8 @@ const DIM = 0x5a5650
 const BUFFER_TONE = 0x7a756d
 
 export const CONVERSATION_RGB = 0x636efa // Plotly blue: the part /compact frees
+export const WARN_RGB = 0xf5a623 // amber: the conversation from WARN_AT
+export const FULL_RGB = 0xef553b // red: the conversation from FULL_AT
 export const SETUP_RGB = 0x9aa0a6 // neutral gray: loaded on every request
 export const hex = (rgb: number) => `#${rgb.toString(16).padStart(6, '0')}`
 
@@ -27,13 +29,14 @@ export function contextFill(b: Pick<SessionContextBreakdown, 'categories' | 'tot
   const used = b.categories.filter(c => c.kind === 'used' && c.tokens > 0)
   const setup = used.filter(c => c.name !== CONVERSATION_ROW).map(c => ({ name: c.name, tokens: c.tokens }))
   const sum = (kind: string, pick = (_: string) => true) => b.categories.filter(c => c.kind === kind && pick(c.name)).reduce((n, c) => n + c.tokens, 0)
+  const percent = Math.round(b.percentage)
   const slices: Slice[] = [
-    { name: 'conversation', tokens: sum('used', n => n === CONVERSATION_ROW), rgb: CONVERSATION_RGB, kind: 'conversation' },
+    { name: 'conversation', tokens: sum('used', n => n === CONVERSATION_ROW), rgb: conversationRgb(percent), kind: 'conversation' },
     { name: 'setup', tokens: sum('used', n => n !== CONVERSATION_ROW), rgb: SETUP_RGB, kind: 'setup' },
     { name: 'free', tokens: sum('free'), rgb: DIM, kind: 'free' },
     { name: 'reserved for auto-compact', tokens: sum('buffer'), rgb: BUFFER_TONE, kind: 'buffer' },
   ]
-  return { slices: slices.filter(s => s.tokens > 0), setup, used: b.totalTokens, window: b.rawMaxTokens, percent: Math.round(b.percentage) }
+  return { slices: slices.filter(s => s.tokens > 0), setup, used: b.totalTokens, window: b.rawMaxTokens, percent }
 }
 
 /**
@@ -86,11 +89,17 @@ export function tokens(n: number): string {
 }
 
 export type Level = 'ok' | 'warn' | 'full'
-export const WARN_AT = 75
-export const FULL_AT = 90
+export const WARN_AT = 60
+export const FULL_AT = 80
 
 export function contextLevel(percent: number): Level {
   return percent >= FULL_AT ? 'full' : percent >= WARN_AT ? 'warn' : 'ok'
+}
+
+/** The conversation's color: blue, then amber from WARN_AT, then red from FULL_AT. */
+export function conversationRgb(percent: number): number {
+  const level = contextLevel(percent)
+  return level === 'full' ? FULL_RGB : level === 'warn' ? WARN_RGB : CONVERSATION_RGB
 }
 
 /** The short figure: "62% · 124k/200k", and a pointer to /compact once the window is nearly full. */

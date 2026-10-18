@@ -2,7 +2,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { CONVERSATION_RGB, contextCells, contextFill, contextLabel, contextLevel, SETUP_RGB, sliceWidths, tokens } from '../hooks/context'
+import { CONVERSATION_RGB, contextCells, conversationRgb, FULL_RGB, WARN_RGB, contextFill, contextLabel, contextLevel, SETUP_RGB, sliceWidths, tokens } from '../hooks/context'
 
 const MAIN = { columns: 120, rows: 40, isFullscreen: false }
 const band = { plugin: 'tldr', surface: 'terminal' as const, component: 'AbovePrompt' as const, requestId: 'band', viewport: MAIN, props: { bodyColumns: 100, hasSurvey: false, isWorking: false, maxRows: 10 } as never }
@@ -21,7 +21,7 @@ function usage(on: On, b: unknown = BREAKDOWN) {
 test('fill: Messages is the conversation; every other used row is setup; deferred rows are left out', async () => {
   const f = contextFill(BREAKDOWN)
   expect(f.slices.map(s => [s.kind, s.tokens])).toEqual([['conversation', 97_000], ['setup', 27_000], ['free', 43_000], ['buffer', 33_000]])
-  expect(f.slices.slice(0, 2).map(s => s.rgb)).toEqual([CONVERSATION_RGB, SETUP_RGB])
+  expect(f.slices.slice(0, 2).map(s => s.rgb)).toEqual([WARN_RGB, SETUP_RGB])
   expect(f.setup.map(r => r.name)).toEqual(['System prompt', 'System tools', 'Memory files'])
   expect(f.percent).toBe(62)
 })
@@ -34,13 +34,15 @@ test('widths: sum to the columns, and a small used row keeps one cell', async ()
   expect(contextCells(f, 40).length).toBe(120)
 })
 
-test('label: percent and tokens; amber from 75%, red from 90% with a pointer to /compact', async () => {
+test('label: percent and tokens; amber from 60%, red from 80% with a pointer to /compact', async () => {
   expect(contextLabel(contextFill(BREAKDOWN))).toBe('62% · 124k/200k')
-  expect(contextLevel(74)).toBe('ok')
-  expect(contextLevel(75)).toBe('warn')
-  expect(contextLevel(90)).toBe('full')
+  expect(contextLevel(59)).toBe('ok')
+  expect(contextLevel(60)).toBe('warn')
+  expect(contextLevel(80)).toBe('full')
   expect(contextLabel(contextFill({ ...BREAKDOWN, percentage: 93, totalTokens: 186_000 }))).toBe('93% · 186k/200k · /compact')
   expect(tokens(1_000_000)).toBe('1M')
+  expect([59, 60, 80].map(conversationRgb)).toEqual([CONVERSATION_RGB, WARN_RGB, FULL_RGB])
+  expect(contextFill({ ...BREAKDOWN, percentage: 93 }).slices[0]!.rgb).toBe(FULL_RGB)
 })
 
 test('band: the bar and its label draw after a measure, and 7 opens the context pane', async ($, on) => {
@@ -50,21 +52,21 @@ test('band: the bar and its label draw after a measure, and 7 opens the context 
   await $.command.run({ command: 'tldr', args: 'context', origin: { kind: 'composer' } } as never)
   const ui = await $.ui.mount(band)
   const text = JSON.stringify(await ui.drawn())
-  for (const s of ['tldr-context-bar', '62% full', 'conversation 97k', 'setup 27k', '"color":"#636efa"', 'engine band']) expect(text).toContain(s)
+  for (const s of ['tldr-context-bar', '62% full', 'conversation 97k', 'setup 27k', '"color":"#f5a623"', 'engine band']) expect(text).toContain(s)
   await ui.press({ key: 'tldr-context-open' })
   expect(opened).toEqual(['tldr-context', 'tldr-context'])
   const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-context', viewport: MAIN, props: {} as never })
   const p = JSON.stringify(await pane.drawn())
   for (const s of ['62% full · 124k of 200k', 'conversation', '/compact frees this', 'setup', 'loaded on every request', '  System prompt', 'free', 'reserved for auto-compact']) expect(p).toContain(s)
-  expect(p).not.toContain('/compact shrinks')
+  expect(p).toContain('/compact shrinks')
 })
 
-test('band: amber label at 80%', async ($, on) => {
+test('band: amber label and bar at 70%', async ($, on) => {
   on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
-  usage(on, { ...BREAKDOWN, percentage: 80, totalTokens: 160_000 })
+  usage(on, { ...BREAKDOWN, percentage: 70, totalTokens: 140_000 })
   await $.command.run({ command: 'tldr', args: 'context', origin: { kind: 'composer' } } as never)
   const text = JSON.stringify(await (await $.ui.mount(band)).drawn())
-  expect(text).toContain('"color":"warning"')
+  for (const s of ['"color":"warning"', '"color":"#f5a623"']) expect(text).toContain(s)
 })
 
 test('context off: no bar, and the command says so', { options: { context: false } }, async ($, on) => {
