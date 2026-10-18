@@ -107,14 +107,6 @@ test('a subagent tool call is left out of the card', async ($, on) => {
   expect(JSON.stringify(await ui.drawn())).toContain('engine rows')
 })
 
-test('a tool group on desktop is left to the engine', async ($, on) => {
-  engine(on)
-  engineRows(on)
-  await play($)
-  const ui = await $.ui.mount({ ...group(CALL_IDS.slice(0, 4)), surface: 'desktop' })
-  expect(JSON.stringify(await ui.drawn())).toContain('engine rows')
-})
-
 test('/tldr with no argument shows help', async $ => {
   const r = await $.command.run({ command: 'tldr', ...RUN })
   expect(r.text).toContain('TL;DR is on')

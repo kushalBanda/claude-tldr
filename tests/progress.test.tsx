@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { fitProgress, progressParts } from '../hooks/progress'
-import { engine, play } from './fixtures/login-bug'
+import { engine } from './fixtures/login-bug'
 
 const working = (isWorking: boolean, bodyColumns = 110) => ({
   plugin: 'tldr', surface: 'terminal' as const, component: 'AbovePrompt' as const, requestId: `band-${isWorking}-${bodyColumns}`,
@@ -45,5 +45,4 @@ test('motion off: no TL;DR line', { options: { motion: false } }, async ($, on) 
   await $.turn.start({ turnId: 'turn-login', text: 'fix the login bug' } as never)
   await $.tool.call({ tool: 'Edit', file_path: 'src/auth.py', old_string: 'a', new_string: 'b', tool_use_id: 'w1' } as never)
   expect(JSON.stringify(await (await $.ui.mount(working(true))).drawn())).not.toContain('TL;DR  ')
-  void play
 })

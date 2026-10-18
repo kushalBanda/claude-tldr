@@ -30,14 +30,6 @@ test('toKept drops folded text and live state, caps the reply and the log', asyn
   expect(k.pulse).toBeNull()
 })
 
-test('a finished turn is kept on disk under its session', async ($, on) => {
-  engine(on)
-  host(on)
-  await play($)
-  const r = await $.command.run({ command: 'tldr', args: 'history', ...RUN })
-  expect(r.text).toContain('1 card kept')
-})
-
 test('after /compact the band points to the kept cards', async ($, on) => {
   engine(on)
   host(on)

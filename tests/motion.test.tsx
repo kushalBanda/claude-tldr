@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 
 import { encodeCells, spinnerFrame } from '../hooks/motion'
 import { activityWord } from '../hooks/summary'
-import { CALL_IDS, engine, play } from './fixtures/login-bug'
+import { engine, play } from './fixtures/login-bug'
 
 const FULL = { columns: 120, rows: 40, isFullscreen: true }
 
@@ -92,7 +92,6 @@ test('card: the newest change flashes right after it lands', async ($, on) => {
     props: { calls: [{ tool_use_id: 'e1', tool: 'Edit', input: {}, isRunning: false, isErrored: false, isInterrupted: false }], isActive: false, isExpanded: false },
   })
   expect(JSON.stringify(await ui.drawn())).toContain('"backgroundColor":"success"')
-  void CALL_IDS
 })
 
 const MAIN = { columns: 120, rows: 40, isFullscreen: false }

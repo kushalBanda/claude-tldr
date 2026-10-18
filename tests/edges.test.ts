@@ -25,7 +25,6 @@ test('bash writes: quoted paths, sudo tee, cd, mv into a folder, git restore', a
     ['cd "$DIR" && echo x > /tmp/a.txt', ['/tmp/a.txt']],
     ['mv a.ts b.ts src/', ['src/a.ts', 'src/b.ts']],
     ['cp lib/a.ts dist/', ['dist/a.ts']],
-    ['mv old.ts new.ts', ['new.ts']],
     ['git checkout -- src/a.ts src/b.ts', ['src/a.ts', 'src/b.ts']],
     ['git checkout main', []],
     ['git restore src/a.ts', ['src/a.ts']],

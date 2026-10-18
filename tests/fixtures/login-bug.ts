@@ -34,7 +34,7 @@ export function engine(on: On): void {
   })
 }
 
-export const TURN_ID = 'turn-login'
+const TURN_ID = 'turn-login'
 
 export async function play($: Engine): Promise<void> {
   await $.turn.start({ turnId: TURN_ID, text: 'fix the login bug, users get logged out after refresh' } as never)
