@@ -72,7 +72,7 @@ function diffColor(l: string): string | undefined {
   return color.dim
 }
 
-export function drawDetail($: EngineInterface, e: RenderInput<'Pane'> | RenderInput<'ToolGroup'> | RenderInput<'ToolUse'>, t: Turn | null, s: Section | 'all') {
+export function drawDetail($: EngineInterface, e: RenderInput<'Pane'> | RenderInput<'ToolGroup'> | RenderInput<'ToolUse'> | RenderInput<'AbovePrompt'>, t: Turn | null, s: Section | 'all') {
   const { Box, Text } = $.ui.resolve(e)
   if (t === null) return <Box key="tldr-detail"><Text color={color.dim}>No turn yet.</Text></Box>
 

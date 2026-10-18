@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- **Click to reveal:** on the main screen, a row key opens its detail on the band above the prompt, as fullscreen opens it inside the card. The same key closes it. No pane.
+
 ## 0.1.1
 
 - **Click to reveal:** in fullscreen, a row's detail opens inside the card instead of a pane on the right. A click on the card no longer draws it twice.
@@ -10,7 +14,7 @@
 The first release.
 
 - **Turn card:** one card per turn with the goal, time, size, changed files, test runs, other commands and reads.
-- **Click to reveal:** in fullscreen, each row opens its detail inside the card, and a second click closes it. On the main screen, a row key opens a pane. Changed groups files by folder. The goal opens the turn as steps.
+- **Click to reveal:** in fullscreen, each row opens its detail inside the card, and a second click closes it. On the main screen, a row key opens its detail on the band above the prompt, and the same key closes it. Changed groups files by folder. The goal opens the turn as steps.
 - **Trust flags:** test files changed in the turn that made tests pass, writes outside the project, deletes, added skip markers, `--no-verify` and force pushes.
 - **Test parsers:** pytest, unittest, jest, vitest, Playwright, go test, gotestsum, cargo, nextest, bun and deno, also behind `npm test`, `make test`, `just test` and `tox`.
 - **Bash parsing:** one command counts every job in it: test runs, writes, deletes and reads.

@@ -1,4 +1,4 @@
-// The band above the prompt: the TL;DR line while a turn runs, the context bar, the kept-cards note after /compact, and on the main screen the rows of the latest card as keys.
+// The band above the prompt: the TL;DR line while a turn runs, the context bar, the kept-cards note after /compact, and on the main screen the rows of the latest card as keys, with the open row's detail under them.
 import type { EngineInterface, RenderElement, RenderInput } from 'claude-code'
 
 import type { Turn } from '../../types'
@@ -8,8 +8,9 @@ import { conversationRgb, SETUP_RGB } from '../context'
 import { encodeCells } from '../motion'
 import type { ProgressPart } from '../progress'
 import { countParts } from './tint'
+import { sectionTitle } from './detail'
 import type { Section } from './detail'
-import { color } from './theme'
+import { color, glyph } from './theme'
 
 export function keptNote(count: number): string {
   return `${count} earlier turn${count === 1 ? '' : 's'} kept · /tldr history`
@@ -19,7 +20,7 @@ export type Reveal = { section: Section | 'all'; label: string; hotkey: string }
 
 /**
  * The rows of the latest card as keys on the band, for the main screen: a printed card can't take a press,
- * but the band can. Each row keeps one digit, so the same key always opens the same row.
+ * but the band can. Each row keeps one digit, so the same key always opens the same row, and pressed again closes it.
  */
 export function revealKeys(t: Turn): Reveal[] {
   const out: Reveal[] = [{ section: 'all', label: 'steps', hotkey: '1' }]
@@ -31,7 +32,7 @@ export function revealKeys(t: Turn): Reveal[] {
   return out
 }
 
-export type BandReveal = { turnId: string; keys: Reveal[]; show: (s: Section | 'all') => void }
+export type BandReveal = { turnId: string; keys: Reveal[]; show: (s: Section | 'all') => void; open: { section: Section | 'all'; detail: RenderElement } | null }
 export type BandContext = { fill: ContextFill; open: () => void }
 export type BandParts = { note: string | null; reveal: BandReveal | null; context: BandContext | null; progress: ProgressPart[] | null }
 
@@ -71,8 +72,15 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest
         <Box key="tldr-reveal" flexDirection="row" columnGap={2}>
           <Text color={color.dim}>TL;DR open</Text>
           {reveal.keys.map(k => (
-            <Button key={`tldr-reveal:${k.section}:${reveal.turnId}`} label={k.label} hotkey={k.hotkey} plain dimColor onPress={() => reveal.show(k.section)} />
+            <Button key={`tldr-reveal:${k.section}:${reveal.turnId}`} label={k.label} hotkey={k.hotkey} plain dimColor={reveal.open?.section !== k.section} onPress={() => reveal.show(k.section)} />
           ))}
+          {reveal.open !== null ? <Text color={color.dim}>{`press it again to close ${glyph.collapse}`}</Text> : null}
+        </Box>
+      ) : null}
+      {reveal?.open ? (
+        <Box key={`tldr-inline:${reveal.turnId}`} flexDirection="column" marginBottom={1}>
+          {reveal.open.section !== 'all' ? <Text bold>{sectionTitle(reveal.open.section)}</Text> : null}
+          {reveal.open.detail}
         </Box>
       ) : null}
       {ctx !== null ? (

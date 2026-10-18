@@ -98,7 +98,7 @@ test('card: the newest change flashes right after it lands', async ($, on) => {
 const MAIN = { columns: 120, rows: 40, isFullscreen: false }
 const mainBand = { ...band, viewport: MAIN }
 
-test('main screen: the band holds the card rows as digit keys, and a key opens the pane', async ($, on) => {
+test('main screen: the band holds the card rows as digit keys; a key opens its detail on the band, no pane, and closes it again', async ($, on) => {
   const opened: string[] = []
   on('ui.open', async (_$, e) => { opened.push((e as { id: string }).id); return { value: { isPlaced: true } } as never })
   engine(on)
@@ -110,9 +110,12 @@ test('main screen: the band holds the card rows as digit keys, and a key opens t
   const text = JSON.stringify(await ui.drawn())
   for (const s of ['"hotkey":"1"', '"label":"steps"', '"hotkey":"3"', '"label":"tests"']) expect(text).toContain(s)
   await ui.press({ key: 'tldr-reveal:tests:turn-login' })
-  expect(opened).toEqual(['tldr-detail'])
-  const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-detail', viewport: MAIN, props: {} as never })
-  expect(JSON.stringify(await pane.drawn())).toContain('12 passed')
+  let band = JSON.stringify(await ui.drawn())
+  for (const s of ['tldr-inline:turn-login', '12 passed', 'press it again to close']) expect(band).toContain(s)
+  expect(opened).toEqual([])
+  await ui.press({ key: 'tldr-reveal:tests:turn-login' })
+  band = JSON.stringify(await ui.drawn())
+  expect(band).not.toContain('tldr-inline:')
 })
 
 test('the band shows no row keys in fullscreen, while Claude works, or before a turn ends', async ($, on) => {

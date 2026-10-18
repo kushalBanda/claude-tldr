@@ -287,9 +287,11 @@ export const register: Register = (on, options) => {
     if (e.surface !== 'terminal' || e.props.hasSurvey) return rest
     const k = f.keep ? await readKept($) : { count: 0, note: false }
     const note = k.note && k.count > 0 ? keptNote(k.count) : null
-    // On the main screen the printed card can't take a press, so its rows sit on the band as digit keys.
+    // On the main screen the printed card can't take a press, so its rows sit on the band as digit keys; a key opens its row's detail on the band.
     const t = f.card && e.viewport?.isFullscreen === false && !e.props.isWorking ? await lastTurn($, f.keep) : null
-    const reveal = t !== null && t.endedAt !== null ? { turnId: t.id, keys: revealKeys(t), show: (s: Section | 'all') => void showDetail($, t, s) } : null
+    const reveal = t !== null && t.endedAt !== null
+      ? { turnId: t.id, keys: revealKeys(t), show: (s: Section | 'all') => toggleInline($, t, s), open: inlineFor?.turnId === t.id ? { section: inlineFor.section, detail: drawDetail($, e, t, inlineFor.section) } : null }
+      : null
     const context = f.context && contextNow !== null ? { fill: contextNow, open: () => void openContext($) } : null
     // While a turn runs: how far it got, in one line, redrawn as calls land (no timer).
     const open = f.card && f.motion && e.props.isWorking ? await latestTurn($) : null
@@ -364,7 +366,7 @@ async function showDetail($: EngineInterface, t: Turn, section: Section | 'all')
   $.ui.invalidate('ui.render')
 }
 
-/** Fullscreen: a press opens a row's detail inside its card, and the same press closes it. */
+/** A press opens a row's detail where it was pressed (inside the fullscreen card, on the main screen's band), and the same press closes it. */
 function toggleInline($: EngineInterface, t: Turn, section: Section | 'all') {
   inlineFor = inlineFor?.turnId === t.id && inlineFor.section === section ? null : { turnId: t.id, section }
   $.ui.invalidate('ui.render')

@@ -40,7 +40,7 @@ Click the goal line. The card lists every step in order, so you see the test fil
 ### Both layouts
 
 - **Fullscreen:** the card takes the place of the tool rows and updates live. Click a row (Changed, Tests, Check, Ran, Looked at) to open its detail inside the card; click it again to close. Changed groups files by folder and shows the first diff lines.
-- **Main screen (scrollback):** printed rows can't change. So each tool group becomes one summary line, and the full card prints where Claude Code's closing line ("Baked for 52s") was. Printed rows can't take a click, so the band above the prompt holds the rows of the latest card as keys: `TL;DR  1 steps  2 changed  3 tests  4 check  5 ran  6 looked at`. Type the digit into the empty prompt and pause, and the same pane opens. `/tldr show` works too.
+- **Main screen (scrollback):** printed rows can't change. So each tool group becomes one summary line, and the full card prints where Claude Code's closing line ("Baked for 52s") was. Printed rows can't take a click, so the band above the prompt holds the rows of the latest card as keys: `TL;DR  1 steps  2 changed  3 tests  4 check  5 ran  6 looked at`. Type the digit into the empty prompt and pause, and that row's detail opens on the band, under the keys. The same digit again closes it. `/tldr show` opens it in a pane.
 
 On desktop and in VS Code, Claude Code draws its own rows. The card is for the terminal.
 
