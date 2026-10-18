@@ -1,4 +1,4 @@
-// The band above the prompt: the context bar, the kept-cards note after /compact, and on the main screen the rows of the latest card as keys.
+// The band above the prompt: the "so far" line while a turn runs, the context bar, the kept-cards note after /compact, and on the main screen the rows of the latest card as keys.
 import type { EngineInterface, RenderElement, RenderInput } from 'claude-code'
 
 import type { Turn } from '../../types'
@@ -6,6 +6,8 @@ import { contextCells, contextLevel, hex, sliceTokens, tokens } from '../context
 import type { ContextFill } from '../context'
 import { CONVERSATION_RGB, SETUP_RGB } from '../context'
 import { encodeCells } from '../motion'
+import type { ProgressPart } from '../progress'
+import { countParts } from './tint'
 import type { Section } from './detail'
 import { color } from './theme'
 
@@ -31,7 +33,7 @@ export function revealKeys(t: Turn): Reveal[] {
 
 export type BandReveal = { turnId: string; keys: Reveal[]; show: (s: Section | 'all') => void }
 export type BandContext = { fill: ContextFill; open: () => void }
-export type BandParts = { note: string | null; reveal: BandReveal | null; context: BandContext | null }
+export type BandParts = { note: string | null; reveal: BandReveal | null; context: BandContext | null; progress: ProgressPart[] | null }
 
 export const CONTEXT_KEY = 'tldr-context-bar'
 const CONTEXT_HOTKEY = '7'
@@ -53,6 +55,19 @@ export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest
     <Box key="tldr-bands" flexDirection="column">
       {rest}
       {parts.note !== null ? <Text key="tldr-kept-note" color={color.dim} wrap="truncate-end">{parts.note}</Text> : null}
+      {parts.progress !== null && parts.progress.length > 0 ? (
+        <Text key="tldr-progress" wrap="truncate-end">
+          <Text color={color.label}>{'so far  '}</Text>
+          {parts.progress.map((p, i) => (
+            <Text color={color.dim}>
+              {i > 0 ? ' · ' : ''}
+              {p.key === 'tests' ? <Text color={p.ok ? color.pass : color.fail}>{p.text}</Text>
+                : p.key === 'files' ? countParts(p.text).map(c => (c.tone === undefined ? c.text : <Text color={c.tone === 'added' ? color.added : color.removed}>{c.text}</Text>))
+                : p.text}
+            </Text>
+          ))}
+        </Text>
+      ) : null}
       {reveal !== null ? (
         <Box key="tldr-reveal" flexDirection="row" columnGap={2}>
           <Text color={color.dim}>TL;DR</Text>

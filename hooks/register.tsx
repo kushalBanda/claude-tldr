@@ -11,6 +11,7 @@ import { drawCard, PULSE_MS } from './draw/card'
 import { drawBand, keptNote, revealKeys } from './draw/band'
 import { CONTEXT_PANE, drawContextPane } from './draw/context'
 import { contextFill } from './context'
+import { fitProgress, progressParts } from './progress'
 import type { ContextFill } from './context'
 import { drawCompactLine } from './draw/compact-line'
 import { DETAIL_PANE, drawDetail, paneRows, paneTitle, sectionOf } from './draw/detail'
@@ -103,6 +104,8 @@ export const register: Register = (on, options) => {
     if (e.agentId === undefined) {
       await updateCurrent($, t => recordCall(t, e.tool_use_id, [])).catch(() => {})
       if (f.motion) await setLive($, l => ({ ...l, word: activityWord(e.tool, e) })).catch(() => {})
+      // The band's "so far" line names the new job.
+      if (f.motion) $.ui.invalidate('ui.render')
       const path = editPath(e.tool, e)
       if (f.actions && path !== undefined && !befores.has(path)) {
         // Missing (ENOENT) is a new file, empty before; any other failure leaves the net diff unknown.
@@ -128,6 +131,8 @@ export const register: Register = (on, options) => {
       if (c?.kind === 'test') return { ...done, pulse: { kind: 'test', key: String(done.testRuns.length - 1), at: now } }
       return done
     }).catch(() => {})
+    // The band's "so far" line counts the finished call.
+    if (f.motion) $.ui.invalidate('ui.render')
     // The flash ends on the next draw after it runs out.
     if (f.motion && f.animation && (calls[0]?.kind === 'change' || calls.some(c => c.kind === 'test'))) $.clock.after(PULSE_MS + 50, () => $.ui.invalidate('ui.render'))
     return ran
@@ -289,8 +294,11 @@ export const register: Register = (on, options) => {
     const t = f.card && e.viewport?.isFullscreen === false && !e.props.isWorking ? await lastTurn($, f.keep) : null
     const reveal = t !== null && t.endedAt !== null ? { turnId: t.id, keys: revealKeys(t), show: (s: Section | 'all') => void showDetail($, t, s) } : null
     const context = f.context && contextNow !== null ? { fill: contextNow, open: () => void openContext($) } : null
-    if (note === null && reveal === null && context === null) return rest
-    return drawBand($, e, rest ?? null, { note, reveal, context })
+    // While a turn runs: how far it got, in one line, redrawn as calls land (no timer).
+    const open = f.card && f.motion && e.props.isWorking ? await latestTurn($) : null
+    const progress = open !== null && open.endedAt === null ? fitProgress(progressParts(open, (await readLive($)).word), e.props.bodyColumns) : null
+    if (note === null && reveal === null && context === null && (progress === null || progress.length === 0)) return rest
+    return drawBand($, e, rest ?? null, { note, reveal, context, progress })
   })
 
   // After a compaction the earlier rows are gone from the screen; the band points to the kept cards.

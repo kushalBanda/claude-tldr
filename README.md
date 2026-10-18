@@ -29,7 +29,7 @@ Answer `y` to add the marketplace, then pick a scope (user is the first one). Th
 - **Trust flags:** the card turns amber and says what to check: a test file changed in the turn that made tests pass, a write outside the project, a deleted file, an added skip, only or xfail marker, `--no-verify`, or a force push.
 - **Click to reveal:** click a row and a pane shows what is behind it. Click the goal and the pane shows the turn as steps.
 - **Context bar:** one line above the prompt shows how full the context window is, in two colors: blue for the conversation, which `/compact` frees, and gray for the setup (system prompt, tools, memory, skills), which every request loads. The label names each color: `62% full · conversation 94k · setup 30k`. The percent turns amber at 75% and red at 90%, and then it points to `/compact`. You decide when to compact. Type `7` into the empty prompt, or run `/tldr context`, for the setup rows and what each part means.
-- **Motion:** a spinner that shows the mode (thinking, running tools, writing) and the current job (`Reading src/auth.py`). It also moves during `/compact`.
+- **Motion:** a spinner that shows the mode (thinking, running tools, writing) and the current job (`Reading src/auth.py`). It also moves during `/compact`. While a turn runs, a "so far" line above the prompt shows how far it got: `so far  14 calls · 3 files +40 −6 · pytest ✗ 3 failed → ✓ 12 passed · now: running pytest`. It redraws only when a call starts or ends, and it goes away when the card takes over.
 - **Kept cards:** each finished card is saved for the session. After `/compact` or a resume, `/tldr history` shows the earlier turns.
 - **Actions:** copy the reply as clean text, or see the net diff of the turn.
 
