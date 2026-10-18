@@ -8,6 +8,10 @@
     "url": "https://github.com/kushalBanda"
   },
   "homepage": "https://github.com/kushalBanda/claude-tldr",
+  "repository": "https://github.com/kushalBanda/claude-tldr",
+  "documentationUrl": "https://github.com/kushalBanda/claude-tldr#readme",
+  "supportUrl": "https://github.com/kushalBanda/claude-tldr/issues",
+  "privacyPolicyUrl": "https://github.com/kushalBanda/claude-tldr/blob/main/PRIVACY.md",
   "license": "MIT",
   "icon": "./.claude-plugin/icon.png",
   "userConfig": {
