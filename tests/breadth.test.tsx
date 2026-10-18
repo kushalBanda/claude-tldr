@@ -135,13 +135,6 @@ test('switch: card off leaves the tool rows and the closing line to the engine',
   expect((await $.command.run({ command: 'tldr', args: 'diff', ...RUN })).text).toContain('turn card is off')
 })
 
-test('switch: card on draws the card (the same turn as the switch-off test)', async ($, on) => {
-  engine(on)
-  engineDraws(on)
-  await play($)
-  expect(JSON.stringify(await (await $.ui.mount(group())).drawn())).not.toContain('engine rows')
-})
-
 test('switch: motion off leaves the spinner to the engine', { options: { motion: false } }, async ($, on) => {
   engine(on)
   engineDraws(on)

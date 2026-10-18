@@ -12,9 +12,6 @@ const RUN = { origin: { kind: 'composer' as const }, presentation: { isFullscree
 const call = (id: string) => ({ tool_use_id: id, tool: 'Read', input: {}, isRunning: false, isErrored: false, isInterrupted: false })
 const group = { plugin: 'tldr', surface: 'terminal' as const, component: 'ToolGroup' as const, requestId: 'group-tu-1', viewport: FULL, props: { calls: CALL_IDS.map(call), isActive: false, isExpanded: false } }
 
-const change = (path: string, added: number, removed: number, isDelete = false) => ({ path, added, removed, viaBash: false, isTest: false, isDelete, outsideRoot: false, addsSkip: false })
-const run = (passed: number, failed: number, isError: boolean) => ({ command: 'pytest', runner: 'pytest', passed, failed, skipped: 0, isError })
-
 function turn(over: Partial<Turn>): Turn {
   return { ...startTurn('t', 'fix the login bug, users get logged out after refresh', 0), ...over }
 }

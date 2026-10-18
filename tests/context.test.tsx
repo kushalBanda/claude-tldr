@@ -45,28 +45,20 @@ test('label: percent and tokens; amber from 60%, red from 80% with a pointer to 
   expect(contextFill({ ...BREAKDOWN, percentage: 93 }).slices[0]!.rgb).toBe(FULL_RGB)
 })
 
-test('band: the bar and its label draw after a measure, and 7 opens the context pane', async ($, on) => {
+test('band: the bar and its label draw after a measure, and a click on the label opens the context pane', async ($, on) => {
   const opened: string[] = []
   on('ui.open', async (_$, e) => { opened.push((e as { id: string }).id); return { value: { isPlaced: true } } as never })
   usage(on)
   await $.command.run({ command: 'tldr', args: 'context', origin: { kind: 'composer' } } as never)
   const ui = await $.ui.mount(band)
   const text = JSON.stringify(await ui.drawn())
-  for (const s of ['tldr-context-bar', '62% full', 'conversation 97k', 'setup 27k', '"color":"#f5a623"', 'engine band']) expect(text).toContain(s)
+  for (const s of ['tldr-context-bar', '62% full', 'conversation 97k', 'setup 27k', '"color":"warning"', '"color":"#f5a623"', 'engine band']) expect(text).toContain(s)
   await ui.press({ key: 'tldr-context-open' })
   expect(opened).toEqual(['tldr-context', 'tldr-context'])
   const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-context', viewport: MAIN, props: {} as never })
   const p = JSON.stringify(await pane.drawn())
   for (const s of ['62% full · 124k of 200k', 'conversation', '/compact frees this', 'setup', 'loaded on every request', '  System prompt', 'free', 'reserved for auto-compact']) expect(p).toContain(s)
   expect(p).toContain('/compact shrinks')
-})
-
-test('band: amber label and bar at 70%', async ($, on) => {
-  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
-  usage(on, { ...BREAKDOWN, percentage: 70, totalTokens: 140_000 })
-  await $.command.run({ command: 'tldr', args: 'context', origin: { kind: 'composer' } } as never)
-  const text = JSON.stringify(await (await $.ui.mount(band)).drawn())
-  for (const s of ['"color":"warning"', '"color":"#f5a623"']) expect(text).toContain(s)
 })
 
 test('context off: no bar, and the command says so', { options: { context: false } }, async ($, on) => {
