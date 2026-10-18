@@ -1,6 +1,6 @@
 // TL;DR for Claude Code: each turn folds into one card.
 // This file only wires hooks; the logic lives in the modules it imports.
-import type { EngineInterface, Register, RenderSurface, Timer } from 'claude-code'
+import type { EngineInterface, Register, RenderInput, RenderSurface, Timer } from 'claude-code'
 
 import type { Live, Turn } from '../types'
 
@@ -38,6 +38,8 @@ let spinnerSite: { requestId: string; mode: SpinnerMode } | null = null
 let diffFor: string | null = null
 // What the detail pane shows: the turn and the row pressed last (or /tldr show).
 let detailFor: { turnId: string; section: Section | 'all' } | null = null
+// Fullscreen: the row whose detail is open inside its card. One at a time; the same press closes it.
+let inlineFor: { turnId: string; section: Section | 'all' } | null = null
 // The context window by category, as the band's bar draws it: measured after each request (a local estimate).
 let contextNow: ContextFill | null = null
 let measuring = false
@@ -219,22 +221,14 @@ export const register: Register = (on, options) => {
     if (found === null) return next(e)
     // Main screen: printed rows cannot change, so each group is one line; the card follows at turn end.
     if (e.viewport?.isFullscreen === false) return e.props.isExpanded ? next(e) : drawCompactLine($, e, e.props.calls, await $.session.root().catch(() => undefined))
-    const expanded = e.props.isExpanded
+    // A click on the group expands it, and its rows are ToolUse rows that would draw the card again: the card stays the one view.
     const { Box } = $.ui.resolve(e)
-    if (!found.isFirst) return expanded ? next(e) : <Box key="tldr-folded" />
+    if (!found.isFirst) return <Box key="tldr-folded" />
     const t = found.turn
     const actions = f.actions && t.endedAt !== null
       ? { copy: (p: { surface: RenderSurface }) => void copyReply($, t, p.surface, true), diff: () => void openDiff($, t) }
       : undefined
-    const card = drawCard($, e, t, { isExpanded: expanded, now: await $.clock.now(), pulse: f.motion && f.animation, actions, show: sec => void showDetail($, t, sec) })
-    if (!expanded) return card
-    const rows = await next(e)
-    return (
-      <Box key="tldr-expanded" flexDirection="column">
-        {card}
-        {rows}
-      </Box>
-    )
+    return drawCard($, e, t, { isExpanded: e.props.isExpanded, now: await $.clock.now(), pulse: f.motion && f.animation, actions, show: sec => toggleInline($, t, sec), open: inlineOpen($, e, t) })
   })
 
   // A call the transcript does not fold into a group (Bash, Edit, Write, ...) is its own row: the same rule as a group.
@@ -250,7 +244,7 @@ export const register: Register = (on, options) => {
       ? { copy: (p: { surface: RenderSurface }) => void copyReply($, t, p.surface, true), diff: () => void openDiff($, t) }
       : undefined
     // A standalone row has no ctrl+o of its own: the card stands for it, and a press opens the detail.
-    return drawCard($, e, t, { isExpanded: false, now: await $.clock.now(), pulse: f.motion && f.animation, actions, show: sec => void showDetail($, t, sec) })
+    return drawCard($, e, t, { isExpanded: false, now: await $.clock.now(), pulse: f.motion && f.animation, actions, show: sec => toggleInline($, t, sec), open: inlineOpen($, e, t) })
   })
 
   // The result block under a standalone row: folded with its row.
@@ -368,6 +362,17 @@ async function showDetail($: EngineInterface, t: Turn, section: Section | 'all')
   detailFor = { turnId: t.id, section }
   await $.ui.open({ id: DETAIL_PANE, title: paneTitle(t, section), focus: true, closeOnEscape: true, rows: paneRows(t, section) })
   $.ui.invalidate('ui.render')
+}
+
+/** Fullscreen: a press opens a row's detail inside its card, and the same press closes it. */
+function toggleInline($: EngineInterface, t: Turn, section: Section | 'all') {
+  inlineFor = inlineFor?.turnId === t.id && inlineFor.section === section ? null : { turnId: t.id, section }
+  $.ui.invalidate('ui.render')
+}
+
+function inlineOpen($: EngineInterface, e: RenderInput<'ToolGroup'> | RenderInput<'ToolUse'>, t: Turn) {
+  if (inlineFor?.turnId !== t.id) return undefined
+  return { section: inlineFor.section, detail: drawDetail($, e, t, inlineFor.section) }
 }
 
 /** The context window by category, as /context counts it but estimated locally, so it costs no request. */

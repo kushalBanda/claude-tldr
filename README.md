@@ -27,7 +27,7 @@ Answer `y` to add the marketplace, then pick a scope (user is the first one). Th
 
 - **Turn card:** one card per turn in place of the tool rows. It shows the goal, the time, the size of the turn (`3 files +18 −6`) and its files, the test runs in order, the other commands in one Ran row (`git ×3 · gh`), and what Claude read and searched. The text Claude writes between tool calls folds into the card. The final reply stays.
 - **Trust flags:** the card turns amber and says what to check: a test file changed in the turn that made tests pass, a write outside the project, a deleted file, an added skip, only or xfail marker, `--no-verify`, or a force push.
-- **Click to reveal:** click a row and a pane shows what is behind it. Click the goal and the pane shows the turn as steps.
+- **Click to reveal:** click a row and what is behind it opens inside the card. Click the goal for the turn as steps. Click again to close.
 - **Context bar:** one line above the prompt shows how full the context window is, in two colors: blue for the conversation, which `/compact` frees, and gray for the setup (system prompt, tools, memory, skills), which every request loads. The label names each color: `62% full · conversation 94k · setup 30k`. The percent and the conversation turn amber at 60% and red at 80%, and then it points to `/compact`. You decide when to compact. Click the label (fullscreen) or run `/tldr context` for the setup rows and what each part means.
 - **Motion:** a spinner that shows the mode (thinking, running tools, writing) and the current job (`Reading src/auth.py`). It also moves during `/compact`. While a turn runs, a TL;DR line above the prompt shows how far it got: `TL;DR  14 calls · 3 files +40 −6 · pytest ✗ 3 failed → ✓ 12 passed · now: running pytest`. It redraws only when a call starts or ends, and it goes away when the card takes over.
 - **Kept cards:** each finished card is saved for the session. After `/compact` or a resume, `/tldr history` shows the earlier turns.
@@ -35,11 +35,11 @@ Answer `y` to add the marketplace, then pick a scope (user is the first one). Th
 
 ### See how the tests went green
 
-Click the goal line. The pane lists every step in order, so you see the test file edit between the red run and the green run. The lower window in the image above shows it.
+Click the goal line. The card lists every step in order, so you see the test file edit between the red run and the green run. The lower window in the image above shows it.
 
 ### Both layouts
 
-- **Fullscreen:** the card takes the place of the tool rows and updates live. Click a row (Changed, Tests, Check, Ran, Looked at) to open its pane. Changed groups files by folder and shows the first diff lines. Escape closes the pane.
+- **Fullscreen:** the card takes the place of the tool rows and updates live. Click a row (Changed, Tests, Check, Ran, Looked at) to open its detail inside the card; click it again to close. Changed groups files by folder and shows the first diff lines.
 - **Main screen (scrollback):** printed rows can't change. So each tool group becomes one summary line, and the full card prints where Claude Code's closing line ("Baked for 52s") was. Printed rows can't take a click, so the band above the prompt holds the rows of the latest card as keys: `TL;DR  1 steps  2 changed  3 tests  4 check  5 ran  6 looked at`. Type the digit into the empty prompt and pause, and the same pane opens. `/tldr show` works too.
 
 On desktop and in VS Code, Claude Code draws its own rows. The card is for the terminal.

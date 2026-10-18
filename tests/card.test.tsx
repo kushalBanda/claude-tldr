@@ -48,14 +48,32 @@ test('later tool groups of the same turn draw nothing while collapsed', async ($
   expect(text).not.toContain('fix the login bug')
 })
 
-test('ctrl+o (isExpanded) shows the engine rows under the card', async ($, on) => {
+test('an expanded group (a click, ctrl+o) still draws the one card, not the card again in its rows', async ($, on) => {
   engine(on)
   engineRows(on)
   await play($)
   const ui = await $.ui.mount({ ...group(CALL_IDS.slice(0, 4), true), surface: 'terminal' })
   const text = JSON.stringify(await ui.drawn())
-  expect(text).toContain('fix the login bug')
-  expect(text).toContain('engine rows')
+  expect(text.split('"key":"tldr-card"').length).toBe(2)
+  expect(text).not.toContain('engine rows')
+  expect(JSON.stringify(await (await $.ui.mount({ ...group(CALL_IDS.slice(4), true), surface: 'terminal' })).drawn())).not.toContain('engine rows')
+})
+
+test('fullscreen: a row press opens its detail inside the card, no pane; the same press closes it', async ($, on) => {
+  const opened: string[] = []
+  on('ui.open', async (_$, e) => { opened.push((e as { id: string }).id); return { value: { isPlaced: true } } as never })
+  engine(on)
+  engineRows(on)
+  await play($)
+  const ui = await $.ui.mount({ ...group(CALL_IDS.slice(0, 1)), surface: 'terminal' })
+  const press = JSON.stringify(await ui.drawn()).match(/tldr-show:changed:[^"]+/)![0]
+  await ui.press({ key: press })
+  let text = JSON.stringify(await ui.drawn())
+  for (const s of ['tldr-inline:', '"  auth.py"', 'click it again to close']) expect(text).toContain(s)
+  expect(opened).toEqual([])
+  await ui.press({ key: press })
+  text = JSON.stringify(await ui.drawn())
+  expect(text).not.toContain('tldr-inline:')
 })
 
 test('/tldr show opens the detail behind a row', async ($, on) => {

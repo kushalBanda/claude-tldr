@@ -1,5 +1,6 @@
-// The detail pane: what sits behind one card row (what Claude read, changed, tested, ran or should be checked).
-// A press on the row opens it; Escape closes it. The card stays the TL;DR; this is the "read it anyway".
+// The detail: what sits behind one card row (what Claude read, changed, tested, ran or should be checked).
+// Fullscreen draws it inside the card, a press on the row toggling it; the main screen and /tldr show open it as a pane.
+// The card stays the TL;DR; this is the "read it anyway".
 import type { EngineInterface, RenderInput } from 'claude-code'
 
 import type { Turn } from '../../types'
@@ -32,6 +33,10 @@ export function sectionOf(word: string): Section | 'all' | null {
   if (w === 'check' || w === 'flags') return 'check'
   if (w === 'notes' || w === 'text') return 'notes'
   return null
+}
+
+export function sectionTitle(s: Section | 'all'): string {
+  return s === 'all' ? 'Steps' : TITLE[s]
 }
 
 export function paneTitle(t: Turn, s: Section | 'all'): string {
@@ -67,7 +72,7 @@ function diffColor(l: string): string | undefined {
   return color.dim
 }
 
-export function drawDetail($: EngineInterface, e: RenderInput<'Pane'>, t: Turn | null, s: Section | 'all') {
+export function drawDetail($: EngineInterface, e: RenderInput<'Pane'> | RenderInput<'ToolGroup'> | RenderInput<'ToolUse'>, t: Turn | null, s: Section | 'all') {
   const { Box, Text } = $.ui.resolve(e)
   if (t === null) return <Box key="tldr-detail"><Text color={color.dim}>No turn yet.</Text></Box>
 

@@ -5,6 +5,7 @@ import type { Change, Turn } from '../../types'
 import { shortPath } from '../classify'
 import { changeTotals } from '../steps'
 import { ranLabel, testLabel } from '../summary'
+import { sectionTitle } from './detail'
 import type { Section } from './detail'
 import { color, glyph, LABEL_WIDTH } from './theme'
 
@@ -28,7 +29,7 @@ export function lookedLabel(t: Turn): string {
 }
 
 export type CardOptions = {
-  /** ctrl+o on a fullscreen group: the engine's rows sit under the card, and the card adds Claude's notes. */
+  /** An expanded fullscreen group (a click, ctrl+o): the card adds Claude's notes. */
   isExpanded: boolean
   /** The engine's own measure of the turn, where it gives one (TurnDuration). */
   durationMs?: number
@@ -37,8 +38,10 @@ export type CardOptions = {
   pulse?: boolean
   /** The action buttons, where presses reach the mod (fullscreen) and the turn is done. */
   actions?: CardActions
-  /** Opens the detail pane behind a row, where presses reach the mod (fullscreen). The goal opens the steps. Absent: rows are plain text. */
+  /** Opens or closes the detail behind a row, where presses reach the mod (fullscreen). The goal opens the steps. Absent: rows are plain text. */
   show?: (s: Section | 'all') => void
+  /** The row whose detail is open inside the card, and that detail drawn. */
+  open?: { section: Section | 'all'; detail: RenderChildren }
 }
 
 export type CardActions = { copy: (p: UiPressArgument) => void; diff: (p: UiPressArgument) => void }
@@ -54,7 +57,7 @@ export function drawCard($: EngineInterface, e: RenderInput<'ToolGroup'> | Rende
   const flash = (kind: 'change' | 'test', key: string) =>
     o.pulse === true && o.now !== undefined && t.pulse !== null && t.pulse.kind === kind && t.pulse.key === key && o.now - t.pulse.at < PULSE_MS
   // The card is the TL;DR; the detail sits one press away: a click in fullscreen; on the main screen, a digit key on the band or /tldr show.
-  const hint = o.show !== undefined ? `click a row ${glyph.expand}` : 'open a row: type its key at the empty prompt'
+  const hint = o.open !== undefined ? `click it again to close ${glyph.collapse}` : o.show !== undefined ? `click a row ${glyph.expand}` : 'open a row: type its key at the empty prompt'
   // A row's value as one press target: the whole value opens its detail, nothing about it changes but the cursor.
   const pressable = (s: Section, children: RenderChildren, n = 0) =>
     o.show !== undefined ? (
@@ -160,6 +163,12 @@ export function drawCard($: EngineInterface, e: RenderInput<'ToolGroup'> | Rende
             </Box>,
           )
         : null}
+      {o.open !== undefined ? (
+        <Box key={`tldr-inline:${t.id}`} flexDirection="column" marginTop={1}>
+          {o.open.section !== 'all' ? <Text bold>{sectionTitle(o.open.section)}</Text> : null}
+          {o.open.detail}
+        </Box>
+      ) : null}
       {o.actions !== undefined && (t.reply !== null || (t.diffs ?? []).length > 0) ? (
         <Box flexDirection="row" justifyContent="flex-end" columnGap={1}>
           {t.reply !== null ? <Button key={`tldr-copy:${t.id}`} label="copy reply" dimColor onPress={o.actions.copy} /> : null}

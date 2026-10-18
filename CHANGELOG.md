@@ -5,7 +5,7 @@
 The first release.
 
 - **Turn card:** one card per turn with the goal, time, size, changed files, test runs, other commands and reads.
-- **Click to reveal:** each row opens a pane. Changed groups files by folder. The goal opens the turn as steps.
+- **Click to reveal:** in fullscreen, each row opens its detail inside the card, and a second click closes it. On the main screen, a row key opens a pane. Changed groups files by folder. The goal opens the turn as steps.
 - **Trust flags:** test files changed in the turn that made tests pass, writes outside the project, deletes, added skip markers, `--no-verify` and force pushes.
 - **Test parsers:** pytest, unittest, jest, vitest, Playwright, go test, gotestsum, cargo, nextest, bun and deno, also behind `npm test`, `make test`, `just test` and `tox`.
 - **Bash parsing:** one command counts every job in it: test runs, writes, deletes and reads.
