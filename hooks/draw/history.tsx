@@ -1,5 +1,5 @@
 // The /tldr history pane: every kept card of this session, newest first, nothing folded.
-import type { EngineInterface, RenderInput } from 'claude-code'
+import type { Elements, RenderInput, RenderSurface } from 'claude-code'
 
 import type { Turn } from '../../types'
 import { testLabel } from '../summary'
@@ -14,8 +14,8 @@ function clock(ms: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-export function drawHistory($: EngineInterface, e: RenderInput<'Pane'>, list: readonly Turn[]) {
-  const { Box, Text } = $.ui.resolve(e)
+export function drawHistory(ui: Elements[RenderSurface], e: RenderInput<'Pane'>, list: readonly Turn[]) {
+  const { Box, Text } = ui
   if (list.length === 0) {
     return (
       <Box key="tldr-history" flexDirection="column">

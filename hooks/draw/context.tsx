@@ -1,5 +1,5 @@
 // The context pane: the bar's three parts with their tokens and share, what each one means, and the setup rows.
-import type { EngineInterface, RenderInput } from 'claude-code'
+import type { Elements, RenderInput } from 'claude-code'
 
 import { contextLevel, tokens } from '../context'
 import type { ContextFill, SliceKind } from '../context'
@@ -20,8 +20,8 @@ const MEANS: Record<SliceKind, string> = {
 
 const swatch = (rgb: number, glyph: number) => encodeCells(Uint32Array.from({ length: SWATCH * 3 }, (_, i) => (i % 3 === 0 ? glyph : i % 3 === 1 ? rgb : 0x01000000)))
 
-export function drawContextPane($: EngineInterface, e: RenderInput<'Pane'>, fill: ContextFill | null) {
-  const { Box, Text, Raster } = $.ui.resolve(e as RenderInput<'Pane', 'terminal'>)
+export function drawContextPane(ui: Elements['terminal'], e: RenderInput<'Pane'>, fill: ContextFill | null) {
+  const { Box, Text, Raster } = ui
   if (fill === null) return <Box key="tldr-context-pane"><Text color={color.dim}>No context figures yet. They come after the first reply.</Text></Box>
   const total = fill.slices.reduce((n, s) => n + s.tokens, 0) || 1
   const level = contextLevel(fill.percent)

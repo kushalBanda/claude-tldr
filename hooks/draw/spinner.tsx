@@ -1,5 +1,5 @@
 // The mode-aware spinner: a Raster the frame loop repaints, then what Claude does now and the elapsed time.
-import type { EngineInterface, RenderInput } from 'claude-code'
+import type { Elements, RenderInput } from 'claude-code'
 
 import { encodeCells, spinnerFrame, SPINNER_COLUMNS } from '../motion'
 import type { SpinnerMode } from '../motion'
@@ -8,8 +8,8 @@ import { color } from './theme'
 
 export const SPINNER_KEY = 'tldr-spin'
 
-export function drawSpinner($: EngineInterface, e: RenderInput<'Spinner'>, word: string, elapsedMs: number | null, ms: number) {
-  const { Box, Text, Raster } = $.ui.resolve(e as RenderInput<'Spinner', 'terminal'>)
+export function drawSpinner(ui: Elements['terminal'], e: RenderInput<'Spinner'>, word: string, elapsedMs: number | null, ms: number) {
+  const { Box, Text, Raster } = ui
   const mode = e.props.mode as SpinnerMode
   return (
     <Box key="tldr-spinner" flexDirection="row" columnGap={1}>

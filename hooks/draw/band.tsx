@@ -1,5 +1,5 @@
 // The band above the prompt: the TL;DR line while a turn runs, the context bar, the kept-cards note after /compact, and on the main screen the rows of the latest card as keys, with the open row's detail under them.
-import type { EngineInterface, RenderElement, RenderInput } from 'claude-code'
+import type { Elements, RenderElement, RenderInput } from 'claude-code'
 
 import type { Turn } from '../../types'
 import { contextCells, contextLevel, hex, sliceTokens, tokens } from '../context'
@@ -38,8 +38,8 @@ export type BandParts = { note: string | null; reveal: BandReveal | null; contex
 
 export const CONTEXT_KEY = 'tldr-context-bar'
 
-export function drawBand($: EngineInterface, e: RenderInput<'AbovePrompt'>, rest: RenderElement | null, parts: BandParts) {
-  const { Box, Text, Button, Raster } = $.ui.resolve(e as RenderInput<'AbovePrompt', 'terminal'>)
+export function drawBand(ui: Elements['terminal'], e: RenderInput<'AbovePrompt'>, rest: RenderElement | null, parts: BandParts) {
+  const { Box, Text, Button, Raster } = ui
   const reveal = parts.reveal
   const ctx = parts.context
   // The label names each color in that color, so the bar reads without a legend: "62% full · conversation 94k · setup 30k".

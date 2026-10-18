@@ -1,5 +1,5 @@
 // The turn card: goal, what changed, tests, what Claude looked at.
-import type { EngineInterface, RenderChildren, RenderInput, UiPressArgument } from 'claude-code'
+import type { Elements, RenderChildren, RenderInput, RenderSurface, UiPressArgument } from 'claude-code'
 
 import type { Change, Turn } from '../../types'
 import { shortPath } from '../classify'
@@ -49,8 +49,8 @@ export type CardActions = { copy: (p: UiPressArgument) => void; diff: (p: UiPres
 export const PULSE_MS = 900
 const NAMES_SHOWN = 3 // file names on the Changed row; the pane lists all
 
-export function drawCard($: EngineInterface, e: RenderInput<'ToolGroup'> | RenderInput<'ToolUse'> | RenderInput<'TurnDuration'>, t: Turn, o: CardOptions) {
-  const { Box, Button, Text } = $.ui.resolve(e)
+export function drawCard(ui: Elements[RenderSurface], e: RenderInput<'ToolGroup'> | RenderInput<'ToolUse'> | RenderInput<'TurnDuration'>, t: Turn, o: CardOptions) {
+  const { Box, Button, Text } = ui
   const ms = o.durationMs ?? (t.endedAt === null ? null : t.endedAt - t.startedAt)
   const meta = ms === null ? `${clock(t.startedAt)} · running` : `${clock(t.startedAt)} · ${duration(ms)}`
   const isExpanded = o.isExpanded

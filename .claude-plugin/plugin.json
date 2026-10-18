@@ -1,6 +1,7 @@
 {
   "name": "tldr",
-  "version": "0.1.2",
+  "displayName": "TL;DR for Claude Code",
+  "version": "0.1.3",
   "description": "TL;DR for Claude Code: every turn as one card, with what to check.",
   "author": {
     "name": "Kushal Banda",
@@ -8,7 +9,7 @@
   },
   "homepage": "https://github.com/kushalBanda/claude-tldr",
   "license": "MIT",
-  "types": "./types/index.d.ts",
+  "icon": "./.claude-plugin/icon.png",
   "userConfig": {
     "card": {
       "type": "boolean",
