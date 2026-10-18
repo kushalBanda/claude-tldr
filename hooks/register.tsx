@@ -1,8 +1,9 @@
 // TL;DR for Claude Code: each turn folds into one card.
-// This file only wires hooks; the logic lives in the modules it imports.
+// This file wires hooks and holds every function that takes $; the logic lives in the modules it imports.
+import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderInput, RenderSurface, Timer } from 'claude-code'
 
-import type { Live, Turn } from '../types'
+import type { Kept, Live, Turn } from '../types'
 
 import { addDiff, cleanCopy, diffOf, mergeNet, turnDiff } from './actions'
 import { classify, placePath } from './classify'
@@ -22,7 +23,7 @@ import { drawSpinner, SPINNER_KEY } from './draw/spinner'
 import { readFeatures } from './features'
 import { encodeCells, spinnerFrame } from './motion'
 import type { SpinnerMode } from './motion'
-import { allTurns, closeCurrent, durationTurn, latestTurn, loadKept, openTurn, readKept, readLive, saveKept, seedTurns, setKept, setLive, turnForCalls, updateCurrent, updateTurn } from './state'
+import { isTurnList, KEPT_MAX, keptKey, MAX_TURNS, turnForCalls, turnForDuration } from './state'
 import { activityWord, isMeta, logLines, runName } from './summary'
 import { checkTurn } from './trust'
 import { endTurn, isInterim, recordCall, recordStep, startTurn, toKept } from './turn'
@@ -220,7 +221,7 @@ export const register: Register = (on, options) => {
     const found = turnForCalls(await allTurns($), ids)
     if (found === null) return next(e)
     // Main screen: printed rows cannot change, so each group is one line; the card follows at turn end.
-    if (e.viewport?.isFullscreen === false) return e.props.isExpanded ? next(e) : drawCompactLine($, e, e.props.calls, await $.session.root().catch(() => undefined))
+    if (e.viewport?.isFullscreen === false) return e.props.isExpanded ? next(e) : drawCompactLine($.ui.resolve(e), e, e.props.calls, await $.session.root().catch(() => undefined))
     // A click on the group expands it, and its rows are ToolUse rows that would draw the card again: the card stays the one view.
     const { Box } = $.ui.resolve(e)
     if (!found.isFirst) return <Box key="tldr-folded" />
@@ -228,7 +229,7 @@ export const register: Register = (on, options) => {
     const actions = f.actions && t.endedAt !== null
       ? { copy: (p: { surface: RenderSurface }) => void copyReply($, t, p.surface, true), diff: () => void openDiff($, t) }
       : undefined
-    return drawCard($, e, t, { isExpanded: e.props.isExpanded, now: await $.clock.now(), pulse: f.motion && f.animation, actions, show: sec => toggleInline($, t, sec), open: inlineOpen($, e, t) })
+    return drawCard($.ui.resolve(e), e, t, { isExpanded: e.props.isExpanded, now: await $.clock.now(), pulse: f.motion && f.animation, actions, show: sec => toggleInline($, t, sec), open: inlineOpen($, e, t) })
   })
 
   // A call the transcript does not fold into a group (Bash, Edit, Write, ...) is its own row: the same rule as a group.
@@ -237,14 +238,14 @@ export const register: Register = (on, options) => {
     const found = turnForCalls(await allTurns($), [e.props.tool_use_id])
     if (found === null) return next(e)
     const t = found.turn
-    if (e.viewport?.isFullscreen === false) return drawCompactLine($, e, [e.props], await $.session.root().catch(() => undefined))
+    if (e.viewport?.isFullscreen === false) return drawCompactLine($.ui.resolve(e), e, [e.props], await $.session.root().catch(() => undefined))
     const { Box } = $.ui.resolve(e)
     if (!found.isFirst) return <Box key="tldr-folded" />
     const actions = f.actions && t.endedAt !== null
       ? { copy: (p: { surface: RenderSurface }) => void copyReply($, t, p.surface, true), diff: () => void openDiff($, t) }
       : undefined
     // A standalone row has no ctrl+o of its own: the card stands for it, and a press opens the detail.
-    return drawCard($, e, t, { isExpanded: false, now: await $.clock.now(), pulse: f.motion && f.animation, actions, show: sec => toggleInline($, t, sec), open: inlineOpen($, e, t) })
+    return drawCard($.ui.resolve(e), e, t, { isExpanded: false, now: await $.clock.now(), pulse: f.motion && f.animation, actions, show: sec => toggleInline($, t, sec), open: inlineOpen($, e, t) })
   })
 
   // The result block under a standalone row: folded with its row.
@@ -278,7 +279,7 @@ export const register: Register = (on, options) => {
       spinnerSite = { requestId: e.requestId, mode: e.props.mode as SpinnerMode }
       startLoop($)
     }
-    return drawSpinner($, e, word, t !== null && t.endedAt === null ? now - t.startedAt : null, frameMs)
+    return drawSpinner($.ui.resolve(e as RenderInput<'Spinner', 'terminal'>), e, word, t !== null && t.endedAt === null ? now - t.startedAt : null, frameMs)
   })
 
   // The band above the prompt: the kept-cards note and the row keys; what other mods draw there stays, above it.
@@ -290,14 +291,14 @@ export const register: Register = (on, options) => {
     // On the main screen the printed card can't take a press, so its rows sit on the band as digit keys; a key opens its row's detail on the band.
     const t = f.card && e.viewport?.isFullscreen === false && !e.props.isWorking ? await lastTurn($, f.keep) : null
     const reveal = t !== null && t.endedAt !== null
-      ? { turnId: t.id, keys: revealKeys(t), show: (s: Section | 'all') => toggleInline($, t, s), open: inlineFor?.turnId === t.id ? { section: inlineFor.section, detail: drawDetail($, e, t, inlineFor.section) } : null }
+      ? { turnId: t.id, keys: revealKeys(t), show: (s: Section | 'all') => toggleInline($, t, s), open: inlineFor?.turnId === t.id ? { section: inlineFor.section, detail: drawDetail($.ui.resolve(e), e, t, inlineFor.section) } : null }
       : null
     const context = f.context && contextNow !== null ? { fill: contextNow, open: () => void openContext($) } : null
     // While a turn runs: how far it got, in one line, redrawn as calls land (no timer).
     const open = f.card && f.motion && e.props.isWorking ? await latestTurn($) : null
     const progress = open !== null && open.endedAt === null ? fitProgress(progressParts(open, (await readLive($)).word), e.props.bodyColumns) : null
     if (note === null && reveal === null && context === null && (progress === null || progress.length === 0)) return rest
-    return drawBand($, e, rest ?? null, { note, reveal, context, progress })
+    return drawBand($.ui.resolve(e as RenderInput<'AbovePrompt', 'terminal'>), e, rest ?? null, { note, reveal, context, progress })
   })
 
   // After a compaction the earlier rows are gone from the screen; the band points to the kept cards.
@@ -320,22 +321,22 @@ export const register: Register = (on, options) => {
     return r
   })
 
-  on('ui.render', { component: 'Pane', requestId: CONTEXT_PANE }, async ($, e) => drawContextPane($, e, contextNow))
-  on('ui.render', { component: 'Pane', requestId: HISTORY_PANE }, async ($, e) => drawHistory($, e, await loadKept($).catch(() => [])))
+  on('ui.render', { component: 'Pane', requestId: CONTEXT_PANE }, async ($, e) => drawContextPane($.ui.resolve(e as RenderInput<'Pane', 'terminal'>), e, contextNow))
+  on('ui.render', { component: 'Pane', requestId: HISTORY_PANE }, async ($, e) => drawHistory($.ui.resolve(e), e, await loadKept($).catch(() => [])))
 
   on('ui.render', { component: 'Pane', requestId: DETAIL_PANE }, async ($, e) => {
     const all = [...(await allTurns($)), ...(f.keep ? await loadKept($).catch(() => []) : [])]
-    return drawDetail($, e, detailFor === null ? null : all.find(t => t.id === detailFor!.turnId) ?? null, detailFor?.section ?? 'all')
+    return drawDetail($.ui.resolve(e), e, detailFor === null ? null : all.find(t => t.id === detailFor!.turnId) ?? null, detailFor?.section ?? 'all')
   })
 
-  on('ui.render', { component: 'Pane', requestId: DIFF_PANE }, async ($, e) => drawDiff($, e, (await allTurns($)).find(t => t.id === diffFor) ?? null))
+  on('ui.render', { component: 'Pane', requestId: DIFF_PANE }, async ($, e) => drawDiff($.ui.resolve(e), e, (await allTurns($)).find(t => t.id === diffFor) ?? null))
 
   // Main screen: the full card takes the place of the turn's closing line ("Baked for 52s").
   on('ui.render', { component: 'TurnDuration' }, async ($, e, next) => {
     if (!f.card || e.surface !== 'terminal' || e.viewport?.isFullscreen !== false) return next(e)
     const t = await durationTurn($, e.requestId, e.props.durationMs)
     if (t === null) return next(e)
-    return drawCard($, e, t, { isExpanded: false, durationMs: e.props.durationMs })
+    return drawCard($.ui.resolve(e), e, t, { isExpanded: false, durationMs: e.props.durationMs })
   })
 
 }
@@ -374,7 +375,7 @@ function toggleInline($: EngineInterface, t: Turn, section: Section | 'all') {
 
 function inlineOpen($: EngineInterface, e: RenderInput<'ToolGroup'> | RenderInput<'ToolUse'>, t: Turn) {
   if (inlineFor?.turnId !== t.id) return undefined
-  return { section: inlineFor.section, detail: drawDetail($, e, t, inlineFor.section) }
+  return { section: inlineFor.section, detail: drawDetail($.ui.resolve(e), e, t, inlineFor.section) }
 }
 
 /** The context window by category, as /context counts it but estimated locally, so it costs no request. */
@@ -427,3 +428,81 @@ async function netDiffs($: EngineInterface): Promise<{ path: string; lines: stri
   return out
 }
 
+// State: TL;DR's atoms, and every read and write of them and of the kept cards.
+
+const turns = atom({ plugin: 'tldr', key: 'turns' } as const, [] as Turn[])
+const live = atom({ plugin: 'tldr', key: 'live' } as const, { phase: 'idle', word: '' } as Live)
+const kept = atom({ plugin: 'tldr', key: 'kept' } as const, { count: 0, note: false } as Kept)
+const current = atom({ plugin: 'tldr', key: 'current' } as const, null as string | null)
+
+async function openTurn($: EngineInterface, t: Turn): Promise<void> {
+  // A turn that never completed (interrupted) ends where the next one starts, so its card stops saying "running".
+  await update($, turns, list => [...(list ?? []).filter(x => x.id !== t.id).map(x => (x.endedAt === null ? { ...x, endedAt: t.startedAt } : x)), t].slice(-MAX_TURNS))
+  await update($, current, () => t.id)
+}
+
+async function updateCurrent($: EngineInterface, fn: (t: Turn) => Turn): Promise<void> {
+  const id = await read($, current)
+  if (id === null) return
+  await update($, turns, list => (list ?? []).map(t => (t.id === id ? fn(t) : t)))
+}
+
+async function updateTurn($: EngineInterface, id: string, fn: (t: Turn) => Turn): Promise<void> {
+  await update($, turns, list => (list ?? []).map(t => (t.id === id ? fn(t) : t)))
+}
+
+async function closeCurrent($: EngineInterface, fn: (t: Turn) => Turn): Promise<void> {
+  await updateCurrent($, fn)
+  await update($, current, () => null)
+}
+
+// Drawing is pure, so the pins live in the module, like the spinner's site. A hot reload starts them over.
+const durationPins = new Map<string, string>()
+
+async function durationTurn($: EngineInterface, site: string, durationMs: number): Promise<Turn | null> {
+  const t = turnForDuration(await read($, turns), durationPins, site, durationMs, await $.clock.now())
+  if (t !== null) durationPins.set(site, t.id)
+  return t
+}
+
+async function latestTurn($: EngineInterface): Promise<Turn | null> {
+  const list = await read($, turns)
+  return list.at(-1) ?? null
+}
+
+async function allTurns($: EngineInterface): Promise<Turn[]> {
+  return read($, turns)
+}
+
+async function readLive($: EngineInterface): Promise<Live> {
+  return read($, live)
+}
+
+async function setLive($: EngineInterface, fn: (l: Live) => Live): Promise<void> {
+  await update($, live, l => fn(l ?? { phase: 'idle', word: '' }))
+}
+
+async function loadKept($: EngineInterface): Promise<Turn[]> {
+  const v = await $.store.get(keptKey(await $.session.id()))
+  return isTurnList(v) ? v : []
+}
+
+async function saveKept($: EngineInterface, t: Turn): Promise<number> {
+  const list = (await loadKept($)).filter(x => x.id !== t.id)
+  const next = [...list, t].slice(-KEPT_MAX)
+  await $.store.set(keptKey(await $.session.id()), next)
+  return next.length
+}
+
+/** A restarted session (a resume, a /tui switch) starts with no turns in memory: the kept cards stand in, so its old rows draw cards again. */
+async function seedTurns($: EngineInterface, list: readonly Turn[]): Promise<void> {
+  await update($, turns, now => ((now ?? []).length > 0 ? now ?? [] : list.slice(-MAX_TURNS)))
+}
+
+async function readKept($: EngineInterface): Promise<Kept> {
+  return read($, kept)
+}
+
+async function setKept($: EngineInterface, fn: (k: Kept) => Kept): Promise<void> {
+  await update($, kept, k => fn(k ?? { count: 0, note: false }))
+}

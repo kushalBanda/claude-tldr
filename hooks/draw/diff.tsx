@@ -1,5 +1,5 @@
 // The diff pane: one turn's edits, opened from the card's diff button.
-import type { EngineInterface, RenderInput } from 'claude-code'
+import type { Elements, RenderInput, RenderSurface } from 'claude-code'
 
 import type { Turn } from '../../types'
 import { turnDiff } from '../actions'
@@ -15,8 +15,8 @@ function lineColor(l: string): string | undefined {
   return undefined
 }
 
-export function drawDiff($: EngineInterface, e: RenderInput<'Pane'>, t: Turn | null) {
-  const { Box, Text } = $.ui.resolve(e)
+export function drawDiff(ui: Elements[RenderSurface], e: RenderInput<'Pane'>, t: Turn | null) {
+  const { Box, Text } = ui
   const text = t === null ? '' : turnDiff(t)
   if (text === '') {
     return (

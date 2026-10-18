@@ -1,7 +1,7 @@
 // The detail: what sits behind one card row (what Claude read, changed, tested, ran or should be checked).
 // Fullscreen draws it inside the card, a press on the row toggling it; the main screen and /tldr show open it as a pane.
 // The card stays the TL;DR; this is the "read it anyway".
-import type { EngineInterface, RenderInput } from 'claude-code'
+import type { Elements, RenderInput, RenderSurface } from 'claude-code'
 
 import type { Turn } from '../../types'
 import { shortPath } from '../classify'
@@ -72,8 +72,8 @@ function diffColor(l: string): string | undefined {
   return color.dim
 }
 
-export function drawDetail($: EngineInterface, e: RenderInput<'Pane'> | RenderInput<'ToolGroup'> | RenderInput<'ToolUse'> | RenderInput<'AbovePrompt'>, t: Turn | null, s: Section | 'all') {
-  const { Box, Text } = $.ui.resolve(e)
+export function drawDetail(ui: Elements[RenderSurface], e: RenderInput<'Pane'> | RenderInput<'ToolGroup'> | RenderInput<'ToolUse'> | RenderInput<'AbovePrompt'>, t: Turn | null, s: Section | 'all') {
+  const { Box, Text } = ui
   if (t === null) return <Box key="tldr-detail"><Text color={color.dim}>No turn yet.</Text></Box>
 
   const empty = (what: string) => <Text color={color.dim}>{what}</Text>

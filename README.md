@@ -3,7 +3,7 @@
 **Every turn, in one card.** What changed, how the tests went, and what to check before you trust it.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.1.2-orange.svg)
+![Version](https://img.shields.io/badge/version-0.1.3-orange.svg)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-2.1.301%2B-d77757.svg)
 ![No network calls](https://img.shields.io/badge/network%20calls-none-success.svg)
 
@@ -82,6 +82,7 @@ pytest, unittest, jest, vitest, Playwright, go test, gotestsum, cargo test and n
 
 - **No network.** TL;DR makes no network calls and starts no processes.
 - **Local only.** It reads the tool calls and results of your session, and the files Claude edits, to build the net diff. The context bar uses Claude Code's local estimate of the window, so it sends no request. Kept cards stay in Claude Code's local plugin store: one list per session, at most 50 cards, without diff bodies.
+- **Hooks that see other calls.** It hooks `command.run` only to answer its own `/tldr` command, and `tool.call` only to read each call and its result, which it passes back unchanged. It never changes or blocks a call.
 - **Check it yourself.** Before you install, run `claude plugin validate` on a clone. The `hooks:` and `calls:` lines list every event the mod handles and every API it calls.
 
 </details>
@@ -103,7 +104,8 @@ pytest, unittest, jest, vitest, Playwright, go test, gotestsum, cargo test and n
 <summary><b>Develop</b></summary>
 
 ```bash
-git clone https://github.com/kushalBanda/claude-tldr && cd claude-tldr
+git clone https://github.com/kushalBanda/claude-tldr
+cd claude-tldr
 claude --plugin-dir .          # run it; a save reloads the mod
 claude plugin validate .       # manifest, marketplace and hooks
 claude plugin test .           # the test suite (tests/*.test.ts*)
