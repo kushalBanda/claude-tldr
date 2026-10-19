@@ -96,6 +96,12 @@ export function isInterim(t: Turn, blockText: string): boolean {
   return text !== '' && t.interim.some(a => a.includes(text))
 }
 
+/** Whether a drawn assistant block is part of this turn's reply. */
+export function isReply(t: Turn, blockText: string): boolean {
+  const text = blockText.trim()
+  return text !== '' && t.reply !== null && t.reply.includes(text)
+}
+
 export function endTurn(t: Turn, now: number): Turn {
   return { ...t, endedAt: now }
 }

@@ -74,6 +74,21 @@ test('fullscreen: the reply stays', async ($, on) => {
   expect(JSON.stringify(await ui.drawn())).toContain(`engine: ${REPLY}`)
 })
 
+test('fullscreen: a later reply that repeats earlier in-between text stays', async ($, on) => {
+  engine(on)
+  const LATER = 'No errors found.'
+  await $.turn.start({ turnId: 't1', text: 'check it' } as never)
+  await step($, 0, `${LATER} I will check the remaining files.`, true)
+  await $.tool.call({ tool: 'Read', file_path: 'a.py', tool_use_id: 'r1' } as never)
+  await step($, 1, 'Done.', false)
+  await $.turn.start({ turnId: 't2', text: 'check again' } as never)
+  const s = $.turn.step({ turnId: 't2', index: 0, model: `${LATER}|`, messageCount: 1 } as never)
+  for await (const _ of s) void _
+  await s.result
+  const ui = await $.ui.mount(message(LATER))
+  expect(JSON.stringify(await ui.drawn())).toContain(`engine: ${LATER}`)
+})
+
 test('main screen: in-between text stays as printed', async ($, on) => {
   engine(on)
   await turnWithNote($)

@@ -27,7 +27,7 @@ import type { SpinnerMode } from './motion'
 import { isTurnList, KEPT_MAX, keptKey, MAX_TURNS, turnForCalls, turnForDuration } from './state'
 import { activityWord, isMeta, logLines, runName } from './summary'
 import { checkTurn } from './trust'
-import { endTurn, isInterim, recordCall, recordStep, startTurn, toKept } from './turn'
+import { endTurn, isInterim, isReply, recordCall, recordStep, startTurn, toKept } from './turn'
 
 const HELP = 'TL;DR is on. Click a card row for its detail, or /tldr show [changed|tests|check|ran|looked] · /tldr context · /tldr history · /tldr copy · /tldr diff'
 
@@ -286,9 +286,9 @@ export const register: Register = (on, options) => {
   // In-between text folds into the card in fullscreen; the main screen keeps what it printed.
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     if (!f.card || e.surface !== 'terminal' || e.viewport?.isFullscreen === false) return next(e)
-    const list = await allTurns($)
-    const owner = list.slice(-50).find(t => isInterim(t, e.props.text))
-    if (owner === undefined) return next(e)
+    // A block that is also some turn's reply is ambiguous (a later answer can repeat earlier in-between text): it stays.
+    const recent = (await allTurns($)).slice(-50)
+    if (!recent.some(t => isInterim(t, e.props.text)) || recent.some(t => isReply(t, e.props.text))) return next(e)
     const { Box } = $.ui.resolve(e)
     return <Box key="tldr-folded-text" />
   })
