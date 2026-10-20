@@ -9,4 +9,4 @@
 - [ ] A test covers the change
 - [ ] The README is updated, if users see the change
 
-<!-- For a change to the card or a pane, add a screenshot. -->
+<!-- For a change to the TL;DR row or a pane, add a screenshot. -->

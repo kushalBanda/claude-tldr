@@ -1,5 +1,5 @@
 name: Idea
-description: Something the card should show, check or do.
+description: Something the TL;DR row should show, check or do.
 labels: [idea]
 body:
   - type: textarea
@@ -13,4 +13,4 @@ body:
     id: idea
     attributes:
       label: Your idea
-      description: What the card (or a command) should do about it.
+      description: What the row (or a command) should do about it.

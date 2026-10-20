@@ -32,7 +32,7 @@ import { verdictOf } from './steps'
 import { checkTurn } from './trust'
 import { endTurn, isInterim, isReply, recordCall, recordStep, startTurn, toKept } from './turn'
 
-const HELP = 'TL;DR is on. Click a card line for its detail, or type its digit at the empty prompt, or /tldr show [changed|tests|check|ran|looked] · /tldr context · /tldr history · /tldr copy · /tldr diff'
+const HELP = 'TL;DR is on. Click a line of the TL;DR row for its detail, or type its digit at the empty prompt, or /tldr show [changed|tests|check|ran|looked] · /tldr context · /tldr history · /tldr copy · /tldr diff'
 
 // The frame loop repaints the spinner between renders (module state: a reload restarts it).
 const FRAME_MS = 80

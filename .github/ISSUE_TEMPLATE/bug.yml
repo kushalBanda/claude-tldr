@@ -1,5 +1,5 @@
 name: Bug
-description: The card, the spinner, the band or an action does something wrong.
+description: The TL;DR row, the spinner, the band or a command does something wrong.
 labels: [bug]
 body:
   - type: textarea
@@ -27,7 +27,7 @@ body:
     attributes:
       label: TL;DR version
       description: From `claude plugin list`.
-      placeholder: 0.1.0
+      placeholder: 0.1.5
   - type: dropdown
     id: layout
     attributes:
@@ -47,4 +47,4 @@ body:
     id: switches
     attributes:
       label: Switches turned off
-      description: Any of card, motion, animation, trust, keep, actions. Leave empty if all are on.
+      description: Any of card, motion, animation, context, trust, keep, actions, notify. Leave empty if all are on.

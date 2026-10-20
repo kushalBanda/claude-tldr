@@ -8,7 +8,7 @@ Use the [issue forms](https://github.com/kushalBanda/claude-tldr/issues/new/choo
 
 - The output of `claude --version`.
 - The layout: fullscreen or main screen.
-- A screenshot of the card, if you can share one.
+- A screenshot of the TL;DR row, if you can share one.
 - The command or tool calls that cause it. A wrong test count needs the last lines of the test output.
 
 ## Set up
@@ -34,7 +34,8 @@ To type-check, run `npx -y -p typescript@5.6.3 tsc -p .`. It needs the engine ty
 | `hooks/tests-parse.ts` | One parser per test runner. |
 | `hooks/trust.ts` | The Check flags. |
 | `hooks/steps.ts`, `hooks/summary.ts` | Totals, folders, steps and the one-line summaries. |
-| `hooks/draw/` | The card, the panes and the history list. |
+| `hooks/progress.ts`, `hooks/durations.ts` | The band's line while a turn runs, and how long each command took last time. |
+| `hooks/draw/` | The TL;DR row, the band, the panes and the history list. |
 | `tests/` | Tests that run in the Claude Code test kit, without a session. |
 
 ## Rules for a change
@@ -52,7 +53,7 @@ To type-check, run `npx -y -p typescript@5.6.3 tsc -p .`. It needs the engine ty
 2. Make the change and add tests.
 3. Run `claude plugin test .` and `claude plugin validate .`. Both must pass.
 4. Update the README if the change shows to users.
-5. Open the pull request. Say what changed, and add a screenshot for a change to the card.
+5. Open the pull request. Say what changed, and add a screenshot for a change to the row.
 
 By sending a pull request, you agree to license your change under the [MIT License](LICENSE).
 

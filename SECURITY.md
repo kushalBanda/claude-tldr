@@ -1,6 +1,6 @@
 # Security
 
-TL;DR runs inside Claude Code with your permissions. It makes no network calls and starts no processes. It reads the tool calls of your session, and the files Claude edits, to build the card and the net diff.
+TL;DR runs inside Claude Code with your permissions. It makes no network calls and starts no processes. It reads the tool calls of your session, and the files Claude edits, to build the TL;DR row and the net diff.
 
 ## Report a problem
 
