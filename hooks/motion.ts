@@ -48,6 +48,7 @@ export function spinnerFrame(mode: SpinnerMode, ms: number, columns = SPINNER_CO
 }
 
 export const FILL_MS = 400 // the plan bar grows to a newly done task over this long
+export const PULSE_MS = 900 // a newly done task stays green this long
 const SHIMMER_MS = 1400 // one sweep of light across the running task
 const TURN = [0x25d0, 0x25d3, 0x25d1, 0x25d2] // ◐ ◓ ◑ ◒
 const EIGHTHS = [0, 0x258f, 0x258e, 0x258d, 0x258c, 0x258b, 0x258a, 0x2589] // ▏ … ▉

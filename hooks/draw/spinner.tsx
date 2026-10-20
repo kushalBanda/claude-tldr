@@ -3,7 +3,7 @@ import type { Elements, RenderInput } from 'claude-code'
 
 import { encodeCells, spinnerFrame, SPINNER_COLUMNS } from '../motion'
 import type { SpinnerMode } from '../motion'
-import { duration } from './card'
+import { duration } from '../durations'
 import { color } from './theme'
 
 export const SPINNER_KEY = 'tldr-spin'

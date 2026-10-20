@@ -79,7 +79,7 @@ function engineRows(on: On) {
   on('ui.render', { component: 'AbovePrompt' }, async () => null as never)
 }
 
-test('card: the login-bug turn shows the Check row and an amber border', async ($, on) => {
+test('card: the login-bug turn shows its flag on a line of its own and an amber dot', async ($, on) => {
   engine(on)
   engineRows(on)
   await play($)
@@ -88,11 +88,10 @@ test('card: the login-bug turn shows the Check row and an amber border', async (
     props: { calls: [{ tool_use_id: CALL_IDS[0], tool: 'Read', input: {}, isRunning: false, isErrored: false, isInterrupted: false }], isActive: false, isExpanded: false },
   })
   const text = JSON.stringify(await ui.drawn())
-  expect(text).toContain('"borderColor":"warning"')
-  expect(text).toContain('Check')
+  expect(text).toContain('{"type":"Text","props":{"color":"warning"},"children":["⏺ "]}')
   expect(text).toContain('⚠ tests/conftest.py changed in the turn that made tests pass')
 })
 
 test('summary: a deleted file reads as deleted, not +0 −0', async () => {
-  expect(groupSummary([{ tool: 'Bash', input: { command: 'rm src/old.py' }, isRunning: false, isErrored: false }])).toEqual(['deleted src/old.py'])
+  expect(groupSummary([{ tool: 'Bash', input: { command: 'rm src/old.py' }, isRunning: false, isErrored: false }]).map(p => p.text)).toEqual(['deleted src/old.py'])
 })

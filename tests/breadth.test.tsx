@@ -142,7 +142,7 @@ test('switch: motion off leaves the spinner to the engine', { options: { motion:
   expect(JSON.stringify(await (await $.ui.mount(spinner)).drawn())).toContain('engine spinner')
 })
 
-test('switch: trust off draws no Check row', { options: { trust: false } }, async ($, on) => {
+test('switch: trust off draws no flag line', { options: { trust: false } }, async ($, on) => {
   engine(on)
   engineDraws(on)
   await play($)
@@ -151,11 +151,10 @@ test('switch: trust off draws no Check row', { options: { trust: false } }, asyn
   expect(text).not.toContain('⚠')
 })
 
-test('switch: actions off draws no buttons and /tldr diff gives the help', { options: { actions: false } }, async ($, on) => {
+test('switch: actions off makes /tldr diff give the help', { options: { actions: false } }, async ($, on) => {
   engine(on)
   engineDraws(on)
   await play($)
-  expect(await (await $.ui.mount(group())).find({ key: 'tldr-diff:turn-login' })).toBeUndefined()
   expect((await $.command.run({ command: 'tldr', args: 'diff', ...RUN })).text).toContain('TL;DR is on')
 })
 
@@ -202,7 +201,9 @@ test('edge: a failed edit is not counted as a change', async ($, on) => {
   on('tool.call', async () => ({ result: 'old_string not found', isError: true }) as never)
   await $.turn.start({ turnId: 'f', text: 'edit' } as never)
   await $.tool.call({ tool: 'Edit', file_path: 'a.py', old_string: 'x', new_string: 'y', tool_use_id: 'f-1' } as never)
-  expect(JSON.stringify(await (await $.ui.mount(group('terminal', ['f-1']))).drawn())).toContain('no files')
+  const text = JSON.stringify(await (await $.ui.mount(group('terminal', ['f-1']))).drawn())
+  expect(text).not.toContain('a.py')
+  expect(text).toContain('ran Edit')
 })
 
 test('edge: desktop and VS Code keep the engine rows', async ($, on) => {

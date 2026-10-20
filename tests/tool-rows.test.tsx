@@ -42,7 +42,7 @@ test('fullscreen: the row of the turn first call draws the card', async ($, on) 
   engineRows(on)
   await play($)
   const text = await drawn($, row('tu-1'))
-  for (const s of ['fix the login bug', 'src/auth.py', '"✓ 12 passed"', 'click a row']) expect(text).toContain(s)
+  for (const s of ['fix the login bug', 'src, tests', '"✓ 12 passed"']) expect(text).toContain(s)
   expect(text).not.toContain('engine row')
 })
 
@@ -104,8 +104,8 @@ test('paths: a path outside the project keeps its last two parts; a project path
 
 test('main screen: an edit line shows the path inside the project, not the absolute path', async () => {
   const edit = { tool: 'Edit', input: { file_path: '/repo/src/auth.py' }, output: { structuredPatch: [{ lines: ['-a', '+b'] }] }, isRunning: false, isErrored: false }
-  expect(groupSummary([edit], '/repo')).toEqual(['src/auth.py +1 −1'])
-  expect(groupSummary([{ ...edit, input: { file_path: '/elsewhere/deep/demo/auth.ts' } }], '/repo')).toEqual(['…/demo/auth.ts +1 −1'])
+  expect(groupSummary([edit], '/repo').map(p => p.text)).toEqual(['src/auth.py +1 −1'])
+  expect(groupSummary([{ ...edit, input: { file_path: '/elsewhere/deep/demo/auth.ts' } }], '/repo').map(p => p.text)).toEqual(['…/demo/auth.ts +1 −1'])
 })
 
 test('card: a file outside the project shows its short path, in the row and in the flag', async ($, on) => {
@@ -116,7 +116,7 @@ test('card: a file outside the project shows its short path, in the row and in t
   await $.tool.call({ tool: 'Edit', file_path: '/private/tmp/x/tldr-demo/auth.ts', old_string: 'a', new_string: 'b', tool_use_id: 'o-1' } as never)
   await $.turn.complete({ turnId: 'o', answer: 'done' } as never)
   const text = await drawn($, row('o-1'))
-  expect(text).toContain('"…/tldr-demo/auth.ts"')
+  expect(text).toContain('"…/tldr-demo/auth.ts "')
   expect(text).toContain('wrote outside the project: …/tldr-demo/auth.ts')
   expect(text).not.toContain('/private/tmp/x')
 })

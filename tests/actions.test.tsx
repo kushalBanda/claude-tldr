@@ -82,27 +82,3 @@ test('command: /tldr diff shows the turn edits', async ($, on) => {
   const r = await $.command.run({ command: 'tldr', args: 'diff', ...RUN })
   for (const s of ['--- a/src/auth.py', '+++ b/src/auth.py', '@@ -1,3 +1,12 @@', '-old', '+new', '+++ b/tests/conftest.py']) expect(r.text).toContain(s)
 })
-
-test('card: a finished turn shows the diff button, and a press opens the pane', async ($, on) => {
-  engine(on)
-  const h = host(on)
-  await play($)
-  const ui = await $.ui.mount(group)
-  expect(await ui.find({ key: 'tldr-diff:turn-login' })).toBeDefined()
-  expect(await ui.find({ key: 'tldr-commit:turn-login' })).toBeUndefined()
-  await ui.press({ key: 'tldr-diff:turn-login' })
-  expect(h.opened).toEqual(['tldr-diff'])
-  const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-diff', viewport: FULL, props: {} as never })
-  const text = JSON.stringify(await pane.drawn())
-  expect(text).toContain('+++ b/src/middleware.py')
-  expect(text).toContain('+new')
-})
-
-test('card: a turn still running shows no action buttons', async ($, on) => {
-  engine(on)
-  host(on)
-  await $.turn.start({ turnId: 'live', text: 'go' } as never)
-  await $.tool.call({ tool: 'Edit', file_path: 'src/auth.py', old_string: 'a', new_string: 'b', tool_use_id: 'tu-1' } as never)
-  const ui = await $.ui.mount(group)
-  expect(await ui.find({ key: 'tldr-diff:live' })).toBeUndefined()
-})

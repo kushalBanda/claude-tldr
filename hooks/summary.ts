@@ -75,8 +75,11 @@ function clip(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text
 }
 
+/** One part of a group's summary; `ok` marks a test run and how it went. */
+export type SummaryPart = { text: string; ok?: boolean }
+
 /** The parts of a tool group's one-line summary, in a stable order. */
-export function groupSummary(calls: readonly GroupCall[], root?: string): string[] {
+export function groupSummary(calls: readonly GroupCall[], root?: string): SummaryPart[] {
   const reads: string[] = []
   const searches: string[] = []
   let others = 0
@@ -84,7 +87,7 @@ export function groupSummary(calls: readonly GroupCall[], root?: string): string
   const changes = new Map<string, { added: number; removed: number }>()
   const deleted: string[] = []
   const viaBash: string[] = []
-  const tests: string[] = []
+  const tests: SummaryPart[] = []
   for (const call of calls) {
     if (isMeta(call.tool)) continue
     if (call.isRunning) {
@@ -99,25 +102,28 @@ export function groupSummary(calls: readonly GroupCall[], root?: string): string
       else if (c.kind === 'change') {
         const old = changes.get(c.change.path) ?? { added: 0, removed: 0 }
         changes.set(c.change.path, { added: old.added + c.change.added, removed: old.removed + c.change.removed })
-      } else if (c.kind === 'test') tests.push(testLabel(c.run).text)
-      else others++
+      } else if (c.kind === 'test') {
+        const l = testLabel(c.run)
+        tests.push({ text: l.text, ok: l.ok })
+      } else others++
     }
   }
-  const parts: string[] = []
+  const parts: SummaryPart[] = []
+  const say = (text: string) => parts.push({ text })
   // Name what was read, searched and written: "Read 1 file" tells you nothing.
-  if (reads.length > 0) parts.push(`Read ${few(unique(reads))}`)
-  if (searches.length === 1) parts.push(`Searched ${clip(searches[0]!, SEARCH_MAX)}`)
-  else if (searches.length > 1) parts.push(plural(searches.length, 'search', 'searches'))
+  if (reads.length > 0) say(`Read ${few(unique(reads))}`)
+  if (searches.length === 1) say(`Searched ${clip(searches[0]!, SEARCH_MAX)}`)
+  else if (searches.length > 1) say(plural(searches.length, 'search', 'searches'))
   // Two edits name their files; more read as one count, so a refactor stays one line.
   if (changes.size > 2) {
     const sum = (k: 'added' | 'removed') => [...changes.values()].reduce((n, d) => n + d[k], 0)
-    parts.push(`edited ${changes.size} files +${sum('added')} ${MINUS}${sum('removed')}`)
-  } else for (const [path, d] of changes) parts.push(`${shortPath(path)} +${d.added} ${MINUS}${d.removed}`)
-  if (viaBash.length > 0) parts.push(`wrote ${few(unique(viaBash))}`)
-  if (deleted.length > 0) parts.push(`deleted ${few(unique(deleted))}`)
+    say(`edited ${changes.size} files +${sum('added')} ${MINUS}${sum('removed')}`)
+  } else for (const [path, d] of changes) say(`${shortPath(path)} +${d.added} ${MINUS}${d.removed}`)
+  if (viaBash.length > 0) say(`wrote ${few(unique(viaBash))}`)
+  if (deleted.length > 0) say(`deleted ${few(unique(deleted))}`)
   parts.push(...tests)
-  if (others > 0) parts.push(plural(others, 'other call', 'other calls'))
-  if (running > 0) parts.push(`${running} running…`)
+  if (others > 0) say(plural(others, 'other call', 'other calls'))
+  if (running > 0) say(`${running} running…`)
   return parts
 }
 
@@ -140,7 +146,7 @@ export function runName(tool: string, input: unknown): string {
   return mcp ? mcp[1]! : tool
 }
 
-/** The card's Ran row: each name once, in first-run order, with a count when it ran more than once. */
+/** The calls the card counts as ran: each name once, in first-run order, with a count when it ran more than once. */
 export function ranLabel(names: readonly string[], max = 6): string {
   const counts = new Map<string, number>()
   for (const n of names) counts.set(n, (counts.get(n) ?? 0) + 1)
@@ -150,7 +156,7 @@ export function ranLabel(names: readonly string[], max = 6): string {
   return shown.join(' · ')
 }
 
-/** Whether a call says nothing a summary line can: not a read, search, change or test. The card's Ran row counts it. */
+/** Whether a call says nothing a summary line can: not a read, search, change or test. The card counts it as ran. */
 export function isQuiet(call: GroupCall, root?: string): boolean {
   return classify(call.tool, call.input, call.output, call.isErrored, root).every(c => c.kind === 'other')
 }

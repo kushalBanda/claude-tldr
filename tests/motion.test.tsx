@@ -82,18 +82,6 @@ test('band: no line of its own; other mods kept, nothing added in fullscreen', a
   expect(text).not.toContain('tldr-reveal')
 })
 
-test('card: the newest change flashes right after it lands', async ($, on) => {
-  engine(on)
-  engineDraws(on)
-  await $.turn.start({ turnId: 't', text: 'go' } as never)
-  await $.tool.call({ tool: 'Edit', file_path: 'src/auth.py', old_string: 'a', new_string: 'b', tool_use_id: 'e1' } as never)
-  const ui = await $.ui.mount({
-    plugin: 'tldr', surface: 'terminal', component: 'ToolGroup', requestId: 'g', viewport: FULL,
-    props: { calls: [{ tool_use_id: 'e1', tool: 'Edit', input: {}, isRunning: false, isErrored: false, isInterrupted: false }], isActive: false, isExpanded: false },
-  })
-  expect(JSON.stringify(await ui.drawn())).toContain('"backgroundColor":"success"')
-})
-
 const MAIN = { columns: 120, rows: 40, isFullscreen: false }
 const mainBand = { ...band, viewport: MAIN }
 
@@ -108,9 +96,11 @@ test('main screen: the band holds the card rows as digit keys; a key opens its d
   expect(await ui.find({ key: 'tldr-reveal:ran:turn-login' })).toBeUndefined()
   const text = JSON.stringify(await ui.drawn())
   for (const s of ['"hotkey":"1"', '"label":"steps"', '"hotkey":"3"', '"label":"tests"']) expect(text).toContain(s)
+  // TL;DR in Claude's orange, then the last card's verdict: amber, a flag to check.
+  expect(text).toContain('{"type":"Text","props":{"color":"claude","bold":true},"children":["TL;DR"]},{"type":"Text","props":{"color":"warning","bold":true},"children":[" ⚠"]}')
   await ui.press({ key: 'tldr-reveal:tests:turn-login' })
   let band = JSON.stringify(await ui.drawn())
-  for (const s of ['tldr-inline:turn-login', '12 passed', 'press it again to close']) expect(band).toContain(s)
+  for (const s of ['tldr-inline:turn-login', '12 passed']) expect(band).toContain(s)
   expect(opened).toEqual([])
   await ui.press({ key: 'tldr-reveal:tests:turn-login' })
   band = JSON.stringify(await ui.drawn())

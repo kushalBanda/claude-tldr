@@ -36,7 +36,7 @@ export type Turn = {
   ran?: string[] // a short name per call that is not a read, search, change or test: git, gh, WebFetch
   interim: string[] // what Claude wrote between tool calls; folded into the card
   reply: string | null // what Claude wrote after its last tool call
-  pulse: Pulse | null // the newest change or test result, for a short highlight
+  jump: Jump | null // the newest notable event: a test result or a new flag, for the band while the turn runs
   flags: Flag[] // what to check before trusting this turn
   diffs: FileDiff[] // the turn's edits as diff lines, for /tldr diff (dropped on disk)
 }
@@ -47,11 +47,19 @@ export type FileDiff = { path: string; lines: string[] }
 export type FlagKind = 'tests-edited' | 'outside-root' | 'deleted' | 'skipped-tests' | 'bypass'
 export type Flag = { kind: FlagKind; detail: string; items?: string[] } // detail fits one row; items show in the Check pane
 
-export type Pulse = { kind: 'change' | 'test'; key: string; at: number }
+export type Tone = 'pass' | 'fail' | 'check'
+
+/** What just happened in the turn: "✗ pytest 3 failed", "⚠ tests/conftest.py changed …", and when. */
+export type Jump = { parts: { text: string; tone: Tone }[]; at: number }
+
+/** The tool call running now, for the band's clock; `lastMs` is how long the same command took last time. */
+export type Running = { id: string; label: string; startedAt: number; isCommand: boolean; lastMs: number | null }
 
 export type Live = {
   phase: 'idle' | 'working' | 'compacting'
   word: string // what Claude does now: "Reading src/auth.py"
+  running: Running | null
+  since: number // when the last tool call ended, or the turn started: the clock while Claude thinks
 }
 
 /** Cards kept on disk; shown after /compact or a resume. */

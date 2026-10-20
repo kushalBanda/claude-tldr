@@ -1,7 +1,7 @@
 {
   "name": "tldr",
   "displayName": "TL;DR for Claude Code",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "TL;DR for Claude Code: every turn as one card, with what to check.",
   "author": {
     "name": "Kushal Banda",
@@ -18,19 +18,19 @@
     "card": {
       "type": "boolean",
       "title": "Turn card",
-      "description": "Fold each turn's tool calls into one card. Off: Claude Code draws its own rows, and trust, keep and actions turn off too.",
+      "description": "Fold each turn's tool calls into one TL;DR row: what changed, how the tests went, what to check. Off: Claude Code draws its own rows, and trust, keep, actions and notify turn off too.",
       "default": true
     },
     "motion": {
       "type": "boolean",
       "title": "Motion",
-      "description": "The mode-aware spinner: what Claude does now, and a moving frame by mode.",
+      "description": "The mode-aware spinner, and the band line while a turn runs: the running step against how long it took last time, and the last test result or flag.",
       "default": true
     },
     "animation": {
       "type": "boolean",
       "title": "Animation",
-      "description": "Moving frames and short pulses. Off: motion keeps static colors only.",
+      "description": "Moving frames, the band clock ticking each second, and short highlights. Off: motion redraws only when a step lands.",
       "default": true
     },
     "context": {
@@ -42,7 +42,7 @@
     "trust": {
       "type": "boolean",
       "title": "Trust flags",
-      "description": "Flag what to check: test files changed to pass, writes outside the project, deletes, skipped tests, --no-verify or force push.",
+      "description": "Flag what to check, one line each on the card: test files changed to pass, writes outside the project, deletes, skipped tests, --no-verify or force push.",
       "default": true
     },
     "keep": {
@@ -54,7 +54,13 @@
     "actions": {
       "type": "boolean",
       "title": "Actions",
-      "description": "/tldr copy and /tldr diff, and the same as buttons on the card.",
+      "description": "/tldr copy copies the reply as clean text; /tldr diff prints the turn's net diff.",
+      "default": true
+    },
+    "notify": {
+      "type": "boolean",
+      "title": "Notify",
+      "description": "When a turn over 30 seconds ends: a notification with its verdict, and the same on the status line until your next prompt.",
       "default": true
     }
   },

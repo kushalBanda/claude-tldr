@@ -102,12 +102,6 @@ export function conversationRgb(percent: number): number {
   return level === 'full' ? FULL_RGB : level === 'warn' ? WARN_RGB : CONVERSATION_RGB
 }
 
-/** The short figure: "62% · 124k/200k", and a pointer to /compact once the window is nearly full. */
-export function contextLabel(fill: ContextFill): string {
-  const base = `${fill.percent}% · ${tokens(fill.used)}/${tokens(fill.window)}`
-  return contextLevel(fill.percent) === 'full' ? `${base} · /compact` : base
-}
-
 /** The tokens of one slice kind, 0 when absent. */
 export function sliceTokens(fill: ContextFill, kind: SliceKind): number {
   return fill.slices.find(s => s.kind === kind)?.tokens ?? 0
