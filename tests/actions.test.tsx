@@ -5,30 +5,22 @@ import { cleanCopy, diffOf, turnDiff } from '../hooks/actions'
 import { readFeatures } from '../hooks/features'
 import { startTurn, toKept } from '../hooks/turn'
 import type { Turn } from '../types'
-import { CALL_IDS, engine, play } from './fixtures/login-bug'
+import { engine, play } from './fixtures/login-bug'
 
-const FULL = { columns: 120, rows: 40, isFullscreen: true }
 const RUN = { origin: { kind: 'composer' as const }, presentation: { isFullscreen: true, columns: 120 } }
-const call = (id: string) => ({ tool_use_id: id, tool: 'Read', input: {}, isRunning: false, isErrored: false, isInterrupted: false })
-const group = { plugin: 'tldr', surface: 'terminal' as const, component: 'ToolGroup' as const, requestId: 'group-tu-1', viewport: FULL, props: { calls: CALL_IDS.map(call), isActive: false, isExpanded: false } }
 
 function turn(over: Partial<Turn>): Turn {
   return { ...startTurn('t', 'fix the login bug, users get logged out after refresh', 0), ...over }
 }
 
-/** The clipboard and the panes, as the engine beneath the plugin answers them. */
-function host(on: On) {
+/** The clipboard, as the engine beneath the plugin answers it. */
+function clipboard(on: On) {
   const copied: string[] = []
-  const opened: string[] = []
   on('ui.copy', async (_$, e) => {
     copied.push(e.text)
     return { value: { isCopied: true } } as never
   })
-  on('ui.open', async (_$, e) => {
-    opened.push(e.id)
-    return { value: { isPlaced: true } } as never
-  })
-  return { copied, opened }
+  return copied
 }
 
 test('actions: cleanCopy removes shared indentation, trailing spaces, CRs and extra blank lines', async () => {
@@ -61,7 +53,7 @@ test('turn: toKept drops the diff lines', async () => {
 
 test('command: /tldr copy writes the clean reply to the clipboard', async ($, on) => {
   engine(on)
-  const h = host(on)
+  const copied = clipboard(on)
   on('turn.step', async function* (_$, e) {
     return { turnId: e.turnId, index: e.index, answer: '  Done.  \r\n  All good.', toolUses: [], stopReason: 'end_turn', usage: null } as never
   })
@@ -71,13 +63,12 @@ test('command: /tldr copy writes the clean reply to the clipboard', async ($, on
   for await (const _ of s) void _
   await s.result
   const r = await $.command.run({ command: 'tldr', args: 'copy', ...RUN })
-  expect(h.copied).toEqual(['Done.\nAll good.'])
+  expect(copied).toEqual(['Done.\nAll good.'])
   expect(r.text).toBe('TL;DR: reply copied.')
 })
 
 test('command: /tldr diff shows the turn edits', async ($, on) => {
   engine(on)
-  host(on)
   await play($)
   const r = await $.command.run({ command: 'tldr', args: 'diff', ...RUN })
   for (const s of ['--- a/src/auth.py', '+++ b/src/auth.py', '@@ -1,3 +1,12 @@', '-old', '+new', '+++ b/tests/conftest.py']) expect(r.text).toContain(s)

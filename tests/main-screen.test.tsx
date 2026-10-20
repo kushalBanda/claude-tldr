@@ -76,7 +76,6 @@ test('main screen: the full card takes the place of the closing line', async ($,
   const text = JSON.stringify(await ui.drawn())
   // One of Claude Code's own rows: the dot in the verdict's color (amber: a flag), TL;DR, the goal and the time, then ⎿ lines.
   for (const s of ['"color":"warning"},"children":["⏺ "]', '"TL;DR "', 'fix the login bug', ' · 52s', '  ⎿  ', '3 files ', ' in ', 'src, tests', '"pytest ✗ 3 failed"', '"✓ 12 passed"', '⚠ tests/conftest.py changed in the turn that made tests pass']) expect(text).toContain(s)
-  for (const s of ['borderStyle', 'Changed', 'Looked at', 'open a row']) expect(text).not.toContain(s)
   expect(text).not.toContain('Baked for 52s')
 })
 

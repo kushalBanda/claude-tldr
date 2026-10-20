@@ -195,7 +195,7 @@ export const register: Register = (on, options) => {
     // The band's TL;DR line counts the finished call.
     if (f.motion) $.ui.invalidate('ui.render')
     return ran
-  }).catch(($, e, next) => next(e)) // a failure here must never stop or change a tool call
+  }).catch((_$, e, next) => next(e)) // a failure here must never stop or change a tool call
 
   // A finished response: text before a tool call folds into the card; text with no tool call is the reply.
   on('turn.step', async function* ($, e, next) {
@@ -341,7 +341,7 @@ export const register: Register = (on, options) => {
     // On the main screen the printed card can't take a press, so its rows sit on the band as digit keys; a key opens its row's detail on the band.
     const t = f.card && e.viewport?.isFullscreen === false && !e.props.isWorking ? await lastTurn($, f.keep) : null
     const reveal = t !== null && t.endedAt !== null
-      ? { turnId: t.id, verdict: verdictOf(t), keys: revealKeys(t), show: (s: Section | 'all') => toggleInline($, t, s), open: inlineFor?.turnId === t.id ? { section: inlineFor.section, detail: drawDetail($.ui.resolve(e), e, t, inlineFor.section) } : null }
+      ? { turnId: t.id, verdict: verdictOf(t), keys: revealKeys(t), show: (s: Section | 'all') => toggleInline($, t, s), open: inlineFor?.turnId === t.id ? { section: inlineFor.section, detail: drawDetail($.ui.resolve(e), t, inlineFor.section) } : null }
       : null
     const context = f.context && contextNow !== null ? { fill: contextNow, open: () => void openContext($) } : null
     // While a turn runs: what runs now against last time, and the last thing that happened. The tick redraws it each second.
@@ -376,12 +376,12 @@ export const register: Register = (on, options) => {
     return r
   })
 
-  on('ui.render', { component: 'Pane', requestId: CONTEXT_PANE }, async ($, e) => drawContextPane($.ui.resolve(e as RenderInput<'Pane', 'terminal'>), e, contextNow))
+  on('ui.render', { component: 'Pane', requestId: CONTEXT_PANE }, async ($, e) => drawContextPane($.ui.resolve(e as RenderInput<'Pane', 'terminal'>), contextNow))
   on('ui.render', { component: 'Pane', requestId: HISTORY_PANE }, async ($, e) => drawHistory($.ui.resolve(e), await loadKept($).catch(() => [])))
 
   on('ui.render', { component: 'Pane', requestId: DETAIL_PANE }, async ($, e) => {
     const all = [...(await allTurns($)), ...(f.keep ? await loadKept($).catch(() => []) : [])]
-    return drawDetail($.ui.resolve(e), e, detailFor === null ? null : all.find(t => t.id === detailFor!.turnId) ?? null, detailFor?.section ?? 'all')
+    return drawDetail($.ui.resolve(e), detailFor === null ? null : all.find(t => t.id === detailFor!.turnId) ?? null, detailFor?.section ?? 'all')
   })
 
   // Main screen: the full card takes the place of the turn's closing line ("Baked for 52s").
@@ -466,7 +466,7 @@ function toggleInline($: EngineInterface, t: Turn, section: Section | 'all') {
 
 function inlineOpen($: EngineInterface, e: RenderInput<'ToolGroup'> | RenderInput<'ToolUse'>, t: Turn) {
   if (inlineFor?.turnId !== t.id) return undefined
-  return { section: inlineFor.section, detail: drawDetail($.ui.resolve(e), e, t, inlineFor.section) }
+  return { section: inlineFor.section, detail: drawDetail($.ui.resolve(e), t, inlineFor.section) }
 }
 
 /** The context window by category, as /context counts it but estimated locally, so it costs no request. */

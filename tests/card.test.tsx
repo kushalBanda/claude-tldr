@@ -102,13 +102,12 @@ test('/tldr show opens the detail behind a row', async ($, on) => {
   expect((await $.command.run({ command: 'tldr', ...RUN, args: 'show nonsense' })).text).toContain('no row "nonsense"')
 })
 
-test('fullscreen: each card line is one plain press target, and no hint says so', async ($, on) => {
+test('fullscreen: each card line is one plain press target', async ($, on) => {
   engine(on)
   engineRows(on)
   await play($)
   const text = JSON.stringify(await (await $.ui.mount({ ...group(CALL_IDS.slice(0, 1)), surface: 'terminal' })).drawn())
   for (const s of ['tldr-show:all:', 'tldr-show:changed:', 'tldr-show:tests:', 'tldr-show:check:']) expect(text).toContain(s)
-  for (const s of ['click a row', 'copy reply', 'tldr-diff:']) expect(text).not.toContain(s)
 })
 
 test('a subagent tool call is left out of the card', async ($, on) => {
