@@ -1,35 +1,38 @@
 // TL;DR for Claude Code: each turn folds into one card.
 // This file wires hooks and holds every function that takes $; the logic lives in the modules it imports.
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderInput, RenderSurface, Timer } from 'claude-code'
+import type { EngineInterface, Register, RenderInput, Timer } from 'claude-code'
 
 import type { Kept, Live, Plan, Turn } from '../types'
 
 import { addDiff, cleanCopy, diffOf, mergeNet, turnDiff } from './actions'
 import { classify, placePath } from './classify'
 import { unifiedDiff } from './netdiff'
-import { drawCard, PULSE_MS } from './draw/card'
+import { drawCard } from './draw/card'
 import { drawBand, keptNote, PLAN_BAR_KEY, PLAN_ROW_KEY, revealKeys } from './draw/band'
 import { CONTEXT_PANE, drawContextPane } from './draw/context'
 import { contextFill } from './context'
-import { fitProgress, progressParts } from './progress'
+import { doneText, jumpParts, nextJump, runLine } from './progress'
 import type { ContextFill } from './context'
 import { drawCompactLine } from './draw/compact-line'
 import { DETAIL_PANE, drawDetail, paneRows, paneTitle, sectionOf } from './draw/detail'
 import type { Section } from './draw/detail'
-import { DIFF_PANE, drawDiff } from './draw/diff'
 import { drawHistory, HISTORY_PANE } from './draw/history'
 import { drawSpinner, SPINNER_KEY } from './draw/spinner'
+import { glyph } from './draw/theme'
+import { commandKey, duration, durationsKey, isDurations, remember, REMEMBER_MS } from './durations'
+import type { Durations } from './durations'
 import { readFeatures } from './features'
-import { encodeCells, fitsCells, planBarFrame, shimmerRowFrame, spinnerFrame } from './motion'
+import { encodeCells, fitsCells, planBarFrame, PULSE_MS, shimmerRowFrame, spinnerFrame } from './motion'
 import { applyTaskCall, EMPTY_PLAN, planView, TASK_TOOLS, taskLabel } from './plan'
 import type { SpinnerMode } from './motion'
 import { isTurnList, KEPT_MAX, keptKey, MAX_TURNS, turnForCalls, turnForDuration } from './state'
 import { activityWord, isMeta, logLines, runName } from './summary'
+import { verdictOf } from './steps'
 import { checkTurn } from './trust'
 import { endTurn, isInterim, isReply, recordCall, recordStep, startTurn, toKept } from './turn'
 
-const HELP = 'TL;DR is on. Click a card row for its detail, or /tldr show [changed|tests|check|ran|looked] · /tldr context · /tldr history · /tldr copy · /tldr diff'
+const HELP = 'TL;DR is on. Click a card line for its detail, or type its digit at the empty prompt, or /tldr show [changed|tests|check|ran|looked] · /tldr context · /tldr history · /tldr copy · /tldr diff'
 
 // The frame loop repaints the spinner between renders (module state: a reload restarts it).
 const FRAME_MS = 80
@@ -39,8 +42,12 @@ let spinnerSite: { requestId: string; mode: SpinnerMode } | null = null
 // The band's stepper as last drawn, for the loop to repaint its bar and running row; doneFrame is when the last task was done.
 let planSite: { requestId: string; done: number; total: number; barColumns: number; row: string | null; rowColumns: number } | null = null
 let doneFrame = -Infinity
-// The turn the diff pane shows: the card whose diff button was pressed last.
-let diffFor: string | null = null
+// The band's clock: once a second while a turn runs, so the running step's time and the ring move between calls.
+const TICK_MS = 1000
+let tick: Timer | undefined
+// A finished turn at least this long sends a notification and leaves its verdict on the status line.
+const LONG_TURN_MS = 30_000
+let statusShown = false
 // What the detail pane shows: the turn and the row pressed last (or /tldr show).
 let detailFor: { turnId: string; section: Section | 'all' } | null = null
 // Fullscreen: the row whose detail is open inside its card. One at a time; the same press closes it.
@@ -106,11 +113,20 @@ export const register: Register = (on, options) => {
     if (e.agentId === undefined) {
       openTurnId = e.turnId
       befores = new Map()
-      await openTurn($, startTurn(e.turnId, e.text, await $.clock.now()))
+      const now = await $.clock.now()
+      await openTurn($, startTurn(e.turnId, e.text, now))
       if (f.keep) await setKept($, k => ({ ...k, note: false })).catch(() => {})
+      // The last long turn's verdict stays on the status line until the next prompt.
+      if (statusShown) {
+        $.ui.status(undefined)
+        statusShown = false
+      }
       if (f.motion) {
-        await setLive($, () => ({ phase: 'working', word: 'Thinking' })).catch(() => {})
-        if (f.animation) startLoop($)
+        await setLive($, () => ({ phase: 'working', word: 'Thinking', running: null, since: now })).catch(() => {})
+        if (f.animation) {
+          startLoop($)
+          tick ??= $.clock.every(TICK_MS, () => $.ui.invalidate('ui.render'))
+        }
       }
     }
     return r
@@ -119,11 +135,17 @@ export const register: Register = (on, options) => {
   // Observe only: the engine's result goes back unchanged.
   on('tool.call', async ($, e, next) => {
     // Link the call to the turn first: the engine draws its group while the call still runs.
+    const startedAt = await $.clock.now()
+    const command = e.tool === 'Bash' ? commandKey(String((e as { command?: unknown }).command ?? '')) : null
     if (e.agentId === undefined) {
       await updateCurrent($, t => recordCall(t, e.tool_use_id, [])).catch(() => {})
-      if (f.motion) await setLive($, l => ({ ...l, word: activityWord(e.tool, e) })).catch(() => {})
-      // The band's TL;DR line names the new job.
-      if (f.motion) $.ui.invalidate('ui.render')
+      if (f.motion) {
+        // The band's TL;DR line names the new job, and a command it has timed before gets a ring against last time.
+        const lastMs = command !== null ? (await loadDurations($))[command] ?? null : null
+        const running = { id: e.tool_use_id, label: activityWord(e.tool, e), startedAt, isCommand: command !== null, lastMs }
+        await setLive($, l => ({ ...l, word: running.label, running })).catch(() => {})
+        $.ui.invalidate('ui.render')
+      }
       const path = editPath(e.tool, e)
       if (f.actions && path !== undefined && !befores.has(path)) {
         // Missing (ENOENT) is a new file, empty before; any other failure leaves the net diff unknown.
@@ -131,8 +153,17 @@ export const register: Register = (on, options) => {
         befores.set(path, typeof text === 'string' && text.length <= BEFORE_MAX ? text : null)
       }
     }
-    const ran = await next(e)
+    const ran = await next(e).finally(async () => {
+      if (e.agentId !== undefined || !f.motion) return
+      const endedAt = await $.clock.now()
+      await setLive($, l => (l.running?.id === e.tool_use_id ? { ...l, word: 'Thinking', running: null, since: endedAt } : l)).catch(() => {})
+    })
     if (e.agentId !== undefined || ran.deny !== undefined) return ran
+    // How long this command took, for the ring next time it runs.
+    if (command !== null && command !== '' && f.motion) {
+      const ms = (await $.clock.now()) - startedAt
+      if (ms >= REMEMBER_MS) await saveDuration($, command, ms).catch(() => {})
+    }
     // Claude's own task list feeds the band's stepper.
     if (f.card && f.motion && TASK_TOOLS.includes(e.tool) && ran.isError !== true && openTurnId !== null) {
       const before = await readPlan($)
@@ -158,15 +189,11 @@ export const register: Register = (on, options) => {
       const called = recordCall(t, e.tool_use_id, calls, lines, meta ? undefined : runName(e.tool, e))
       const recorded = diff === null ? called : { ...called, diffs: addDiff(called.diffs, diff) }
       const done = f.trust ? { ...recorded, flags: checkTurn(recorded) } : recorded
-      const c = calls[0]
-      if (c?.kind === 'change') return { ...done, pulse: { kind: 'change', key: c.change.path, at: now } }
-      if (c?.kind === 'test') return { ...done, pulse: { kind: 'test', key: String(done.testRuns.length - 1), at: now } }
-      return done
+      // A test result or a new flag is the band's "last" until the next one.
+      return { ...done, jump: nextJump(t, done, now) ?? t.jump }
     }).catch(() => {})
     // The band's TL;DR line counts the finished call.
     if (f.motion) $.ui.invalidate('ui.render')
-    // The flash ends on the next draw after it runs out.
-    if (f.motion && f.animation && (calls[0]?.kind === 'change' || calls.some(c => c.kind === 'test'))) $.clock.after(PULSE_MS + 50, () => $.ui.invalidate('ui.render'))
     return ran
   }).catch(($, e, next) => next(e)) // a failure here must never stop or change a tool call
 
@@ -195,8 +222,11 @@ export const register: Register = (on, options) => {
           if (count !== null) await setKept($, k => ({ ...k, count })).catch(() => {})
         }
       }
-      if (f.motion) await setLive($, l => ({ ...l, phase: 'idle', word: '' })).catch(() => {})
+      if (f.motion) await setLive($, () => ({ phase: 'idle', word: '', running: null, since: now })).catch(() => {})
       endLoop()
+      tick?.cancel()
+      tick = undefined
+      if (f.notify) await tellDone($, now)
     }
     return r
   })
@@ -247,15 +277,12 @@ export const register: Register = (on, options) => {
     const found = turnForCalls(await allTurns($), ids)
     if (found === null) return next(e)
     // Main screen: printed rows cannot change, so each group is one line; the card follows at turn end.
-    if (e.viewport?.isFullscreen === false) return e.props.isExpanded ? next(e) : drawCompactLine($.ui.resolve(e), e, e.props.calls, await $.session.root().catch(() => undefined))
+    if (e.viewport?.isFullscreen === false) return e.props.isExpanded ? next(e) : drawCompactLine($.ui.resolve(e), e.props.calls, await $.session.root().catch(() => undefined))
     // A click on the group expands it, and its rows are ToolUse rows that would draw the card again: the card stays the one view.
     const { Box } = $.ui.resolve(e)
     if (!found.isFirst) return <Box key="tldr-folded" />
     const t = found.turn
-    const actions = f.actions && t.endedAt !== null
-      ? { copy: (p: { surface: RenderSurface }) => void copyReply($, t, p.surface, true), diff: () => void openDiff($, t) }
-      : undefined
-    return drawCard($.ui.resolve(e), e, t, { isExpanded: e.props.isExpanded, now: await $.clock.now(), pulse: f.motion && f.animation, actions, show: sec => toggleInline($, t, sec), open: inlineOpen($, e, t) })
+    return drawCard($.ui.resolve(e), t, { isExpanded: e.props.isExpanded, show: sec => toggleInline($, t, sec), open: inlineOpen($, e, t) })
   })
 
   // A call the transcript does not fold into a group (Bash, Edit, Write, ...) is its own row: the same rule as a group.
@@ -264,14 +291,11 @@ export const register: Register = (on, options) => {
     const found = turnForCalls(await allTurns($), [e.props.tool_use_id])
     if (found === null) return next(e)
     const t = found.turn
-    if (e.viewport?.isFullscreen === false) return drawCompactLine($.ui.resolve(e), e, [e.props], await $.session.root().catch(() => undefined))
+    if (e.viewport?.isFullscreen === false) return drawCompactLine($.ui.resolve(e), [e.props], await $.session.root().catch(() => undefined))
     const { Box } = $.ui.resolve(e)
     if (!found.isFirst) return <Box key="tldr-folded" />
-    const actions = f.actions && t.endedAt !== null
-      ? { copy: (p: { surface: RenderSurface }) => void copyReply($, t, p.surface, true), diff: () => void openDiff($, t) }
-      : undefined
     // A standalone row has no ctrl+o of its own: the card stands for it, and a press opens the detail.
-    return drawCard($.ui.resolve(e), e, t, { isExpanded: false, now: await $.clock.now(), pulse: f.motion && f.animation, actions, show: sec => toggleInline($, t, sec), open: inlineOpen($, e, t) })
+    return drawCard($.ui.resolve(e), t, { isExpanded: false, show: sec => toggleInline($, t, sec), open: inlineOpen($, e, t) })
   })
 
   // The result block under a standalone row: folded with its row.
@@ -317,16 +341,19 @@ export const register: Register = (on, options) => {
     // On the main screen the printed card can't take a press, so its rows sit on the band as digit keys; a key opens its row's detail on the band.
     const t = f.card && e.viewport?.isFullscreen === false && !e.props.isWorking ? await lastTurn($, f.keep) : null
     const reveal = t !== null && t.endedAt !== null
-      ? { turnId: t.id, keys: revealKeys(t), show: (s: Section | 'all') => toggleInline($, t, s), open: inlineFor?.turnId === t.id ? { section: inlineFor.section, detail: drawDetail($.ui.resolve(e), e, t, inlineFor.section) } : null }
+      ? { turnId: t.id, verdict: verdictOf(t), keys: revealKeys(t), show: (s: Section | 'all') => toggleInline($, t, s), open: inlineFor?.turnId === t.id ? { section: inlineFor.section, detail: drawDetail($.ui.resolve(e), e, t, inlineFor.section) } : null }
       : null
     const context = f.context && contextNow !== null ? { fill: contextNow, open: () => void openContext($) } : null
-    // While a turn runs: how far it got, in one line, redrawn as calls land (no timer).
+    // While a turn runs: what runs now against last time, and the last thing that happened. The tick redraws it each second.
     const open = f.card && f.motion && e.props.isWorking ? await latestTurn($) : null
-    const progress = open !== null && open.endedAt === null ? fitProgress(progressParts(open, (await readLive($)).word), e.props.bodyColumns) : null
-    const plan = open !== null && open.endedAt === null ? await planParts($, e.requestId, open.id, e.props.bodyColumns, f.animation) : null
+    const running = open !== null && open.endedAt === null
+    const now = running ? await $.clock.now() : 0
+    const l = running ? await readLive($) : null
+    const run = l !== null ? runLine({ word: l.word, running: l.running, since: l.since, now, turn: open! }) : null
+    const plan = running ? await planParts($, e.requestId, open!.id, e.props.bodyColumns, f.animation) : null
     if (plan === null && planSite?.requestId === e.requestId) planSite = null
-    if (note === null && reveal === null && context === null && plan === null && (progress === null || progress.length === 0)) return rest
-    return drawBand($.ui.resolve(e as RenderInput<'AbovePrompt', 'terminal'>), e, rest ?? null, { note, reveal, context, progress, plan })
+    if (note === null && reveal === null && context === null && run === null) return rest
+    return drawBand($.ui.resolve(e as RenderInput<'AbovePrompt', 'terminal'>), e, rest ?? null, { note, reveal, context, run, plan, last: running ? jumpParts(open!.jump, now) : [] })
   })
 
   // After a compaction the earlier rows are gone from the screen; the band points to the kept cards.
@@ -350,21 +377,29 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: CONTEXT_PANE }, async ($, e) => drawContextPane($.ui.resolve(e as RenderInput<'Pane', 'terminal'>), e, contextNow))
-  on('ui.render', { component: 'Pane', requestId: HISTORY_PANE }, async ($, e) => drawHistory($.ui.resolve(e), e, await loadKept($).catch(() => [])))
+  on('ui.render', { component: 'Pane', requestId: HISTORY_PANE }, async ($, e) => drawHistory($.ui.resolve(e), await loadKept($).catch(() => [])))
 
   on('ui.render', { component: 'Pane', requestId: DETAIL_PANE }, async ($, e) => {
     const all = [...(await allTurns($)), ...(f.keep ? await loadKept($).catch(() => []) : [])]
     return drawDetail($.ui.resolve(e), e, detailFor === null ? null : all.find(t => t.id === detailFor!.turnId) ?? null, detailFor?.section ?? 'all')
   })
 
-  on('ui.render', { component: 'Pane', requestId: DIFF_PANE }, async ($, e) => drawDiff($.ui.resolve(e), e, (await allTurns($)).find(t => t.id === diffFor) ?? null))
-
   // Main screen: the full card takes the place of the turn's closing line ("Baked for 52s").
   on('ui.render', { component: 'TurnDuration' }, async ($, e, next) => {
     if (!f.card || e.surface !== 'terminal' || e.viewport?.isFullscreen !== false) return next(e)
     const t = await durationTurn($, e.requestId, e.props.durationMs)
     if (t === null) return next(e)
-    return drawCard($.ui.resolve(e), e, t, { isExpanded: false, durationMs: e.props.durationMs })
+    return drawCard($.ui.resolve(e), t, { isExpanded: false, durationMs: e.props.durationMs })
+  })
+
+  // Main screen: the line under the prompt says the latest card's rows open by digit, while the prompt is empty and Claude idle.
+  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
+    if (!f.card || e.surface !== 'terminal' || e.viewport?.isFullscreen !== false || e.props.isDraft || e.props.isWorking) return next(e)
+    const t = await lastTurn($, f.keep)
+    if (t === null || t.endedAt === null) return next(e)
+    const keys = revealKeys(t)
+    const range = keys.length === 1 ? keys[0]!.hotkey : `${keys[0]!.hotkey}–${keys.at(-1)!.hotkey}`
+    return next({ ...e, props: { ...e.props, tail: ` · type ${range} to open the last card` } })
   })
 
 }
@@ -399,16 +434,21 @@ async function lastTurn($: EngineInterface, keep: boolean): Promise<Turn | null>
   return (await loadKept($).catch(() => [])).at(-1) ?? null
 }
 
-async function copyText($: EngineInterface, text: string, what: string, surface: RenderSurface | undefined, toast: boolean): Promise<string> {
-  const r = await $.ui.copy(surface === undefined ? { text } : { text, surface })
-  const said = r.isCopied ? `TL;DR: ${what} copied.` : `TL;DR: could not copy the ${what} (${r.reason}).`
-  if (toast) $.ui.toast(said)
-  return said
+async function copyReply($: EngineInterface, t: Turn): Promise<string> {
+  if (t.reply === null) return `TL;DR: "${t.goal}" has no reply to copy.`
+  const r = await $.ui.copy({ text: cleanCopy(t.reply) })
+  return r.isCopied ? 'TL;DR: reply copied.' : `TL;DR: could not copy the reply (${r.reason}).`
 }
 
-async function copyReply($: EngineInterface, t: Turn, surface?: RenderSurface, toast = false): Promise<string> {
-  if (t.reply === null) return `TL;DR: "${t.goal}" has no reply to copy.`
-  return copyText($, cleanCopy(t.reply), 'reply', surface, toast)
+/** A long turn that just ended: a notification with its verdict, and the same on the status line until the next prompt. */
+async function tellDone($: EngineInterface, now: number) {
+  const t = await latestTurn($)
+  if (t === null || t.toolUseIds.length === 0 || now - t.startedAt < LONG_TURN_MS) return
+  const v = verdictOf(t)
+  const mark = v === 'pass' || v === 'fail' || v === 'check' ? ` ${glyph[v]}` : ''
+  $.ui.status(`TL;DR${mark} done ${duration(now - t.startedAt)}`)
+  statusShown = true
+  await $.ui.notify(doneText(t, now - t.startedAt), { title: 'TL;DR' }).catch(() => {})
 }
 
 /** Opens the detail pane behind a card row: small, holding the keys, closed by Escape. */
@@ -452,11 +492,6 @@ async function openContext($: EngineInterface) {
   await $.ui.open({ id: CONTEXT_PANE, title: 'TL;DR context', focus: true, closeOnEscape: true, rows: (contextNow?.slices.length ?? 1) + (contextNow?.setup.length ?? 0) + 3 })
 }
 
-async function openDiff($: EngineInterface, t: Turn) {
-  diffFor = t.id
-  await $.ui.open({ id: DIFF_PANE, title: `TL;DR diff · ${t.goal}` })
-}
-
 function editPath(tool: string, input: unknown): string | undefined {
   if (!EDIT_TOOLS.includes(tool)) return undefined
   const i = input as { file_path?: unknown; notebook_path?: unknown }
@@ -482,7 +517,8 @@ async function netDiffs($: EngineInterface): Promise<{ path: string; lines: stri
 // State: TL;DR's atoms, and every read and write of them and of the kept cards.
 
 const turns = atom({ plugin: 'tldr', key: 'turns' } as const, [] as Turn[])
-const live = atom({ plugin: 'tldr', key: 'live' } as const, { phase: 'idle', word: '' } as Live)
+const IDLE: Live = { phase: 'idle', word: '', running: null, since: 0 }
+const live = atom({ plugin: 'tldr', key: 'live' } as const, IDLE)
 const kept = atom({ plugin: 'tldr', key: 'kept' } as const, { count: 0, note: false } as Kept)
 const current = atom({ plugin: 'tldr', key: 'current' } as const, null as string | null)
 const planAtom = atom({ plugin: 'tldr', key: 'plan' } as const, EMPTY_PLAN as Plan)
@@ -539,7 +575,17 @@ async function readLive($: EngineInterface): Promise<Live> {
 }
 
 async function setLive($: EngineInterface, fn: (l: Live) => Live): Promise<void> {
-  await update($, live, l => fn(l ?? { phase: 'idle', word: '' }))
+  await update($, live, l => fn(l ?? IDLE))
+}
+
+async function loadDurations($: EngineInterface): Promise<Durations> {
+  const v = await $.store.get(durationsKey(await $.session.root().catch(() => undefined))).catch(() => undefined)
+  return isDurations(v) ? v : {}
+}
+
+async function saveDuration($: EngineInterface, command: string, ms: number): Promise<void> {
+  const key = durationsKey(await $.session.root().catch(() => undefined))
+  await $.store.set(key, remember(await loadDurations($), command, ms))
 }
 
 async function loadKept($: EngineInterface): Promise<Turn[]> {

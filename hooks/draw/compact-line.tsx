@@ -1,23 +1,31 @@
 // The main screen's one line per tool group: rows printed there cannot change later,
-// so each group says what it did in one line and the full card follows at the end of the turn.
+// so each group says what it did in one line and the card follows at the end of the turn.
+// A line that ran tests shows the result in green or red, its dot too, so a red run stands out in scrollback.
 // Calls a line cannot name (git, gh, an MCP tool) draw nothing: a row of them would read "1 other call" again and again,
-// and the card's Ran row stacks them into one line.
-import type { Elements, RenderInput, RenderSurface } from 'claude-code'
+// and the card stacks them into one line.
+import type { Elements, RenderSurface } from 'claude-code'
 
 import { groupSummary, isQuiet } from '../summary'
 import type { GroupCall } from '../summary'
-import { color } from './theme'
+import { color, glyph } from './theme'
 import { countParts } from './tint'
 
-export function drawCompactLine(ui: Elements[RenderSurface], e: RenderInput<'ToolGroup'> | RenderInput<'ToolUse'>, calls: readonly GroupCall[], root?: string) {
+export function drawCompactLine(ui: Elements[RenderSurface], calls: readonly GroupCall[], root?: string) {
   const { Box, Text } = ui
   if (calls.every(c => isQuiet(c, root))) return <Box key="tldr-quiet" />
   const parts = groupSummary(calls, root)
+  const runs = parts.filter(p => p.ok !== undefined)
+  const dot = runs.length === 0 ? color.accent : runs.every(p => p.ok) ? color.pass : color.fail
   return (
     <Text key="tldr-line" wrap="truncate-end">
-      <Text color={color.accent}>{'⏺ '}</Text>
+      <Text color={dot}>{`${glyph.dot} `}</Text>
       <Text color={color.dim}>
-        {countParts(parts.length > 0 ? parts.join(' · ') : 'tool calls').map(p => (p.tone === undefined ? p.text : <Text color={p.tone === 'added' ? color.added : color.removed}>{p.text}</Text>))}
+        {parts.length === 0 ? 'tool calls' : parts.map((p, i) => [
+          i > 0 ? ' · ' : '',
+          p.ok !== undefined
+            ? <Text color={p.ok ? color.pass : color.fail}>{p.text}</Text>
+            : countParts(p.text).map(c => (c.tone === undefined ? c.text : <Text color={c.tone === 'added' ? color.added : color.removed}>{c.text}</Text>)),
+        ])}
       </Text>
     </Text>
   )

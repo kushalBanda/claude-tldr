@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.5
+
+- **The card is a row:** each turn ends with a row in the transcript's own style, `⏺ TL;DR <goal> · 52s`, and under `⎿` what changed and how the tests went, then one line per thing to check. The dot's color is the verdict: green, red, amber for a flag, gray with no test run. No box, no labels. More than one file reads as its size and folders, so a 60-file refactor stays one line.
+- **Long turns:** the TL;DR line above the prompt ticks each second. A command it has timed before gets a ring against last time (`◑ … 38s of ~1m 12s`); the first run says so. After it comes the last test result or flag and how long ago. Between calls it says how long Claude has been thinking.
+- **Notify:** a turn over 30 seconds ends with a notification carrying its verdict, and the status line keeps it until your next prompt. A new `notify` switch, on by default.
+- **Main screen:** a tool line that ran tests shows the result and its dot in green or red. The band shows `TL;DR` in Claude's orange with the last turn's verdict. The line under an empty prompt says the digits open the last card.
+- **Removed:** the card's copy and diff buttons and the diff pane (`/tldr copy` and `/tldr diff` stay), the hint lines on the card and the band, and the flash on a new change.
+
 ## 0.1.4
 
 - **Task stepper:** when Claude writes a task list (`TaskCreate` and `TaskUpdate`, or `TodoWrite`), the band above the prompt shows it while the turn runs: a bar filled by tasks done, the count, and up to five tasks. Done tasks tick off, the running one names what Claude does now with a sweep of light, the rest wait dim. With no list, the TL;DR line stays as before. Behind `motion`; `animation` off holds it still.

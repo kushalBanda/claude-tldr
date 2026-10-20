@@ -41,7 +41,7 @@ export function startTurn(id: string, prompt: string, now: number): Turn {
     ran: [],
     interim: [],
     reply: null,
-    pulse: null,
+    jump: null,
     flags: [],
     diffs: [],
   }
@@ -112,5 +112,5 @@ const KEPT_LOG_MAX = 40
 /** A finished turn trimmed for disk: no folded text, no diff lines, a capped reply and log, no live state. */
 export function toKept(t: Turn): Turn {
   const reply = t.reply === null ? null : t.reply.length > KEPT_REPLY_MAX ? `${t.reply.slice(0, KEPT_REPLY_MAX - 1)}…` : t.reply
-  return { ...t, interim: [], reply, log: t.log.slice(-KEPT_LOG_MAX), ranLog: (t.ranLog ?? []).slice(-KEPT_LOG_MAX), pulse: null, diffs: [] }
+  return { ...t, interim: [], reply, log: t.log.slice(-KEPT_LOG_MAX), ranLog: (t.ranLog ?? []).slice(-KEPT_LOG_MAX), jump: null, diffs: [] }
 }

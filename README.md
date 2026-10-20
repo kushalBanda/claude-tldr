@@ -1,15 +1,15 @@
 # TL;DR for Claude Code
 
-**Every turn, in one card.** What changed, how the tests went, and what to check before you trust it.
+**Every turn, in one row.** What changed, how the tests went, and what to check before you trust it, in Claude Code's own row style.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.1.4-orange.svg)
+![Version](https://img.shields.io/badge/version-0.1.5-orange.svg)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-2.1.301%2B-d77757.svg)
 ![No network calls](https://img.shields.io/badge/network%20calls-none-success.svg)
 
-![Left: a Claude Code turn as 33 lines of reads, edits and test logs. Right: the same turn as one TL;DR card that flags the changed test file, and the steps pane under it.](.github/assets/before-after.png)
+![Left: a Claude Code turn as 33 lines of reads, edits and test logs. Right: the same turn as one line per tool group, then a three-line TL;DR row with an amber dot that flags the changed test file, the row keys and the prompt hint.](.github/assets/before-after.png)
 
-![33 lines become 5 rows. A Check row flags edits that can fake a green run. No network calls.](.github/assets/value.png)
+![33 lines become 3. The dot turns amber and each edit that can fake a green run gets its own line. No network calls.](.github/assets/value.png)
 
 ## Install
 
@@ -25,19 +25,19 @@ Also listed on [claudecodemods.com](https://claudecodemods.com/extensions/claude
 
 ## Features
 
-![A card with an amber border lists four checks: a write outside the project, a deleted file, an added skip marker, and skipped hooks with a force push.](.github/assets/trust.png)
+![A TL;DR row with an amber dot and four lines to check: a write outside the project, a deleted file, an added skip marker, and skipped hooks with a force push.](.github/assets/trust.png)
 
-![The Changed row is open inside the card: files grouped by folder, with the first diff lines of auth.py.](.github/assets/reveal.png)
+![In fullscreen, the changes line is open under the row: files grouped by folder, with the first diff lines of auth.py.](.github/assets/reveal.png)
 
-![A spinner reads "Running pytest", and one TL;DR line above the prompt shows files, the red-to-green test runs and the current job.](.github/assets/progress.png)
+![A spinner reads "Running pytest". The TL;DR line above the prompt shows a half-filled ring, 38s of about 1m 12s last time, and the last result: pytest 3 failed 1m 30s ago.](.github/assets/progress.png)
 
 ![Three context bars: 38% full in blue, 62% full in amber, and 86% full in red with a pointer to /compact.](.github/assets/context.png)
 
-![On the main screen, the band above the prompt shows the rows as digit keys. Key 3 opens the test runs under it.](.github/assets/band.png)
+![On the main screen, the band above the prompt shows TL;DR, the last turn's verdict and its rows as digit keys. Key 3 opens the test runs under it.](.github/assets/band.png)
 
-![The /tldr history pane lists two kept cards, newest first.](.github/assets/history.png)
+![The /tldr history pane lists two kept rows with their replies, newest first.](.github/assets/history.png)
 
-Also: `/tldr copy` copies the reply as clean text, and `/tldr diff` prints the net diff of the turn. On desktop and in VS Code, Claude Code draws its own rows. The card is for the terminal.
+Also: when a turn over 30 seconds ends, a notification carries its verdict, and the status line keeps it until your next prompt. `/tldr copy` copies the reply as clean text, and `/tldr diff` prints the net diff of the turn. On desktop and in VS Code, Claude Code draws its own rows. TL;DR is for the terminal.
 
 ## Reference
 
@@ -47,7 +47,7 @@ Also: `/tldr copy` copies the reply as clean text, and `/tldr diff` prints the n
 | Command | Does |
 | --- | --- |
 | `/tldr` | Help. |
-| `/tldr show [row]` | Open what's behind a row of the latest card: `changed`, `tests`, `check`, `ran`, `looked`, `notes`. With no row, the steps of the turn in order. Escape closes it. |
+| `/tldr show [row]` | Open what's behind the latest card: `changed`, `tests`, `check`, `ran`, `looked`, `notes`. With no row, the steps of the turn in order. Escape closes it. |
 | `/tldr context` | Open the context pane: each category that fills the window, with its tokens and share. |
 | `/tldr history` | Open the kept cards of this session, newest first. |
 | `/tldr copy` | Copy the latest reply as clean text: no trailing spaces, no shared indentation. |
@@ -62,13 +62,14 @@ Every feature is a switch, and all are on by default. Change them with `/plugin 
 
 | Switch | Off means |
 | --- | --- |
-| `card` | Claude Code's own rows. Also turns off `trust`, `keep` and `actions`. |
-| `motion` | Claude Code's own spinner. |
-| `animation` | Motion keeps its colors but doesn't move. |
+| `card` | Claude Code's own rows. Also turns off `trust`, `keep`, `actions` and `notify`. |
+| `motion` | Claude Code's own spinner, and no TL;DR line while a turn runs. |
+| `animation` | Motion keeps its colors but doesn't move. The band's clock moves only when a step lands. |
 | `context` | No context bar. |
-| `trust` | No Check row, no amber border. |
+| `trust` | No lines to check, no amber dot. |
 | `keep` | Nothing saved, no note after `/compact`. |
-| `actions` | No buttons, no copy or diff commands. |
+| `actions` | No copy or diff commands. |
+| `notify` | No notification and no status line when a long turn ends. |
 
 </details>
 
@@ -83,7 +84,8 @@ pytest, unittest, jest, vitest, Playwright, go test, gotestsum, cargo test and n
 <summary><b>Privacy and trust</b></summary>
 
 - **No network.** TL;DR makes no network calls and starts no processes.
-- **Local only.** It reads the tool calls and results of your session, and the files Claude edits, to build the net diff. The context bar uses Claude Code's local estimate of the window, so it sends no request. Kept cards stay in Claude Code's local plugin store: one list per session, at most 50 cards, without diff bodies.
+- **Local only.** It reads the tool calls and results of your session, and the files Claude edits, to build the net diff. The context bar uses Claude Code's local estimate of the window, so it sends no request. Kept cards stay in Claude Code's local plugin store: one list per session, at most 50 cards, without diff bodies. The same store keeps how long each Bash command took, at most 100 per project, for the band's ring.
+- **Notifications.** A turn over 30 seconds ends with a notification through your own Claude Code notification setting. The `notify` switch turns it off.
 - **Hooks that see other calls.** It hooks `command.run` only to answer its own `/tldr` command, and `tool.call` only to read each call and its result, which it passes back unchanged. It never changes or blocks a call.
 - **Check it yourself.** Before you install, run `claude plugin validate` on a clone. The `hooks:` and `calls:` lines list every event the mod handles and every API it calls.
 
@@ -115,13 +117,13 @@ claude plugin test .           # the test suite (tests/*.test.ts*)
 
 The mod is TypeScript with no dependencies. Render hooks are pure, and all parsing is static: TL;DR never runs a command to learn what a command did. See [CONTRIBUTING.md](CONTRIBUTING.md) to send a change.
 
-The images in this README are mock-ups of the mod's output.
+The images in this README are mock-ups of the mod's output, drawn by `node scripts/shots.mjs`.
 
 </details>
 
 ## Contributing
 
-Bug reports, ideas and pull requests are welcome. Use the [issue forms](https://github.com/kushalBanda/claude-tldr/issues/new/choose). A screenshot of the card helps a lot. To report a security problem, see [SECURITY.md](SECURITY.md).
+Bug reports, ideas and pull requests are welcome. Use the [issue forms](https://github.com/kushalBanda/claude-tldr/issues/new/choose). A screenshot of the TL;DR row helps a lot. To report a security problem, see [SECURITY.md](SECURITY.md).
 
 ## License
 

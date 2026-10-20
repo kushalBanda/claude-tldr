@@ -1,41 +1,88 @@
-// The TL;DR line on the band while a turn runs: the card's facts in one line, so a long turn shows how far it got. Pure.
-import type { Turn } from '../types'
-import { changeTotals } from './steps'
+// The band's line while a turn runs: what runs now and how far it is against last time, then the last thing that happened.
+// Also the one line a finished long turn sends as a notification. Pure.
+import type { Jump, Running, Tone, Turn } from '../types'
+import { glyph } from './draw/theme'
+import { duration, ring } from './durations'
+import { changeTotals, verdictOf } from './steps'
 import { testLabel } from './summary'
 
-export type ProgressPart = { key: 'calls' | 'files' | 'tests' | 'now'; text: string; ok?: boolean }
+export type RunPart = { text: string; tone: Tone | 'accent' | 'dim' | 'text' }
 
+const CLOCK_FROM_MS = 2000 // under this a clock says nothing worth reading
 const MINUS = '−'
 
-/** The parts, most expendable first: calls, files, tests, then what Claude does now. */
-export function progressParts(t: Pick<Turn, 'toolUseIds' | 'changes' | 'testRuns'>, word: string): ProgressPart[] {
-  const out: ProgressPart[] = []
-  const calls = t.toolUseIds.length
-  if (calls > 0) out.push({ key: 'calls', text: `${calls} call${calls === 1 ? '' : 's'}` })
-  if (t.changes.length > 0) {
-    const s = changeTotals(t.changes)
-    const files = `${s.files} file${s.files === 1 ? '' : 's'}`
-    out.push({ key: 'files', text: s.counted ? `${files} +${s.added} ${MINUS}${s.removed}` : files })
+/** "pytest ✗ 3 failed" and "⚠ tests/conftest.py changed …" from one call: the runs and flags `after` has that `before` did not. */
+export function nextJump(before: Pick<Turn, 'testRuns' | 'flags'>, after: Pick<Turn, 'testRuns' | 'flags'>, now: number): Jump | null {
+  const parts: Jump['parts'] = []
+  const run = after.testRuns.length > before.testRuns.length ? after.testRuns.at(-1) : undefined
+  if (run !== undefined) {
+    const l = testLabel(run)
+    parts.push({ text: l.text, tone: l.ok ? 'pass' : 'fail' })
   }
-  // The last two runs, as the card's Tests row reads them: a rerun of the same runner shows its result only.
-  const runs = t.testRuns.slice(-2).map(testLabel)
-  if (runs.length > 0) {
-    const [a, b] = runs
-    const sameRunner = b !== undefined && t.testRuns.at(-1)!.runner === t.testRuns.at(-2)!.runner
-    const text = b === undefined ? a!.text : `${a!.text} → ${sameRunner ? b.result : b.text}`
-    out.push({ key: 'tests', text, ok: (b ?? a)!.ok })
+  for (const f of after.flags) {
+    if (!before.flags.some(g => g.kind === f.kind && g.detail === f.detail)) parts.push({ text: `${glyph.check} ${f.detail}`, tone: 'check' })
   }
-  if (word !== '') out.push({ key: 'now', text: `now: ${word.charAt(0).toLowerCase()}${word.slice(1)}` })
-  return out
+  return parts.length > 0 ? { parts, at: now } : null
 }
 
-/** The parts that fit `columns` beside the label: drop calls, then files; tests and now stay (the row truncates). */
-export function fitProgress(parts: readonly ProgressPart[], columns: number, label = 'TL;DR'): ProgressPart[] {
-  const width = (ps: readonly ProgressPart[]) => label.length + 2 + ps.reduce((n, p) => n + p.text.length + 3, 0)
-  let out = [...parts]
-  for (const drop of ['calls', 'files'] as const) {
-    if (width(out) <= columns) break
-    out = out.filter(p => p.key !== drop)
+/** " · last: ✗ pytest 3 failed 1m 30s ago": the jump and its age, as the band and the stepper's head end. */
+export function jumpParts(jump: Jump | null, now: number): RunPart[] {
+  if (jump === null) return []
+  const age = now - jump.at
+  return [
+    { text: ' · last: ', tone: 'dim' },
+    ...jump.parts.flatMap((p, i): RunPart[] => (i > 0 ? [{ text: ' · ', tone: 'dim' }, p] : [p])),
+    { text: age < CLOCK_FROM_MS ? ' just now' : ` ${duration(age)} ago`, tone: 'dim' },
+  ]
+}
+
+function filesText(t: Pick<Turn, 'changes'>): string | null {
+  if (t.changes.length === 0) return null
+  const s = changeTotals(t.changes)
+  const files = `${s.files} file${s.files === 1 ? '' : 's'}`
+  return s.counted ? `${files} +${s.added} ${MINUS}${s.removed}` : files
+}
+
+export type RunInput = { word: string; running: Running | null; since: number; now: number; turn: Pick<Turn, 'jump' | 'changes'> }
+
+/**
+ * The line: "◑ Running pytest -q 38s of ~1m 12s · last: ✗ pytest 3 failed 1m 30s ago".
+ * A command gets a ring against last time; anything else, and Claude thinking between calls, gets a plain clock.
+ * With nothing happened yet, the files changed so far stand in for the jump.
+ */
+export function runLine(o: RunInput): RunPart[] {
+  const out: RunPart[] = []
+  const r = o.running
+  if (r !== null) {
+    const ms = o.now - r.startedAt
+    if (r.isCommand) out.push({ text: `${ring(ms, r.lastMs)} `, tone: 'accent' })
+    out.push({ text: r.label, tone: 'text' })
+    if (ms >= CLOCK_FROM_MS) {
+      out.push({ text: ` ${duration(ms)}`, tone: 'text' })
+      if (r.isCommand) out.push({ text: r.lastMs === null ? ' · first run' : ms > r.lastMs ? ` · past ~${duration(r.lastMs)}` : ` of ~${duration(r.lastMs)}`, tone: 'dim' })
+    }
+  } else {
+    const ms = o.now - o.since
+    out.push({ text: o.word, tone: 'text' })
+    if (ms >= CLOCK_FROM_MS) out.push({ text: ` ${duration(ms)}`, tone: 'text' })
   }
-  return out
+  const jump = o.turn.jump ?? null
+  if (jump !== null) return [...out, ...jumpParts(jump, o.now)]
+  const files = filesText(o.turn)
+  return files === null ? out : [...out, { text: ` · ${files}`, tone: 'dim' }]
+}
+
+/** The finished turn in one line, for a notification: "⚠ fix the login bug · ✓ 12 passed · 1 to check · 3 files +18 −6 · 4m 12s". */
+export function doneText(t: Turn, ms: number): string {
+  const v = verdictOf(t)
+  const mark = v === 'pass' || v === 'fail' || v === 'check' ? `${glyph[v]} ` : ''
+  const last = t.testRuns.at(-1)
+  const parts = [
+    `${mark}${t.goal}`,
+    last !== undefined ? testLabel(last).result : null,
+    t.flags.length > 0 ? `${t.flags.length} to check` : null,
+    filesText(t),
+    duration(ms),
+  ]
+  return parts.filter((p): p is string => p !== null).join(' · ')
 }

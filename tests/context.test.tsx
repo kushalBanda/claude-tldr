@@ -2,7 +2,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { CONVERSATION_RGB, contextCells, conversationRgb, FULL_RGB, WARN_RGB, contextFill, contextLabel, contextLevel, SETUP_RGB, sliceWidths, tokens } from '../hooks/context'
+import { CONVERSATION_RGB, contextCells, conversationRgb, FULL_RGB, WARN_RGB, contextFill, contextLevel, SETUP_RGB, sliceWidths, tokens } from '../hooks/context'
 
 const MAIN = { columns: 120, rows: 40, isFullscreen: false }
 const band = { plugin: 'tldr', surface: 'terminal' as const, component: 'AbovePrompt' as const, requestId: 'band', viewport: MAIN, props: { bodyColumns: 100, hasSurvey: false, isWorking: false, maxRows: 10 } as never }
@@ -34,12 +34,10 @@ test('widths: sum to the columns, and a small used row keeps one cell', async ()
   expect(contextCells(f, 40).length).toBe(120)
 })
 
-test('label: percent and tokens; amber from 60%, red from 80% with a pointer to /compact', async () => {
-  expect(contextLabel(contextFill(BREAKDOWN))).toBe('62% · 124k/200k')
+test('level: amber from 60%, red from 80%', async () => {
   expect(contextLevel(59)).toBe('ok')
   expect(contextLevel(60)).toBe('warn')
   expect(contextLevel(80)).toBe('full')
-  expect(contextLabel(contextFill({ ...BREAKDOWN, percentage: 93, totalTokens: 186_000 }))).toBe('93% · 186k/200k · /compact')
   expect(tokens(1_000_000)).toBe('1M')
   expect([59, 60, 80].map(conversationRgb)).toEqual([CONVERSATION_RGB, WARN_RGB, FULL_RGB])
   expect(contextFill({ ...BREAKDOWN, percentage: 93 }).slices[0]!.rgb).toBe(FULL_RGB)

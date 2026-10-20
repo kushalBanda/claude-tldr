@@ -8,11 +8,11 @@ import { conversationRgb, SETUP_RGB } from '../context'
 import { encodeCells } from '../motion'
 import { taskLabel } from '../plan'
 import type { PlanView } from '../plan'
-import type { ProgressPart } from '../progress'
-import { countParts } from './tint'
+import type { RunPart } from '../progress'
+import type { Verdict } from '../steps'
 import { sectionTitle } from './detail'
 import type { Section } from './detail'
-import { color, glyph } from './theme'
+import { color, glyph, toneColor, verdictColor } from './theme'
 
 export function keptNote(count: number): string {
   return `${count} earlier turn${count === 1 ? '' : 's'} kept · /tldr history`
@@ -34,11 +34,11 @@ export function revealKeys(t: Turn): Reveal[] {
   return out
 }
 
-export type BandReveal = { turnId: string; keys: Reveal[]; show: (s: Section | 'all') => void; open: { section: Section | 'all'; detail: RenderElement } | null }
+export type BandReveal = { turnId: string; verdict: Verdict; keys: Reveal[]; show: (s: Section | 'all') => void; open: { section: Section | 'all'; detail: RenderElement } | null }
 export type BandContext = { fill: ContextFill; open: () => void }
 /** The stepper: the bar and the running task's row are Rasters the frame loop repaints; `rowCells` null draws that row as Text. */
 export type BandPlan = { view: PlanView; barCells: string; barColumns: number; rowCells: string | null; rowColumns: number; justDone: string | null }
-export type BandParts = { note: string | null; reveal: BandReveal | null; context: BandContext | null; progress: ProgressPart[] | null; plan?: BandPlan | null }
+export type BandParts = { note: string | null; reveal: BandReveal | null; context: BandContext | null; run: RunPart[] | null; plan: BandPlan | null; last: RunPart[] }
 
 export const CONTEXT_KEY = 'tldr-context-bar'
 export const PLAN_BAR_KEY = 'tldr-plan-bar'
@@ -57,23 +57,27 @@ export function drawBand(ui: Elements['terminal'], e: RenderInput<'AbovePrompt'>
   const labelLength = head.length + (wide ? conv.length + setup.length + 6 : 0)
   // The label takes its own cells, one more for the gap; the bar takes the rest.
   const barColumns = Math.max(4, e.props.bodyColumns - labelLength - 1)
+  const mark = <Text color={color.accent} bold>{'TL;DR  '}</Text>
+  const verdict = reveal !== null && (reveal.verdict === 'pass' || reveal.verdict === 'fail' || reveal.verdict === 'check') ? reveal.verdict : null
   return (
     <Box key="tldr-bands" flexDirection="column">
       {rest}
       {parts.note !== null ? <Text key="tldr-kept-note" color={color.dim} wrap="truncate-end">{parts.note}</Text> : null}
-      {parts.plan ? drawPlan(ui, parts.plan, parts.progress ?? []) : parts.progress !== null && parts.progress.length > 0 ? (
-        <Text key="tldr-progress" wrap="truncate-end">
-          <Text bold>{'TL;DR  '}</Text>
-          {progressText(ui, parts.progress)}
+      {parts.plan ? drawPlan(ui, parts.plan, parts.last) : parts.run !== null ? (
+        <Text key="tldr-run" wrap="truncate-end">
+          {mark}
+          {runText(ui, parts.run)}
         </Text>
       ) : null}
       {reveal !== null ? (
         <Box key="tldr-reveal" flexDirection="row" columnGap={2}>
-          <Text color={color.dim}>TL;DR open</Text>
+          <Text>
+            <Text color={color.accent} bold>TL;DR</Text>
+            {verdict !== null ? <Text color={verdictColor[verdict]} bold>{` ${glyph[verdict]}`}</Text> : ''}
+          </Text>
           {reveal.keys.map(k => (
             <Button key={`tldr-reveal:${k.section}:${reveal.turnId}`} label={k.label} hotkey={k.hotkey} plain dimColor={reveal.open?.section !== k.section} onPress={() => reveal.show(k.section)} />
           ))}
-          {reveal.open !== null ? <Text color={color.dim}>{`press it again to close ${glyph.collapse}`}</Text> : null}
         </Box>
       ) : null}
       {reveal?.open ? (
@@ -98,33 +102,23 @@ export function drawBand(ui: Elements['terminal'], e: RenderInput<'AbovePrompt'>
   )
 }
 
-function progressText(ui: Elements['terminal'], parts: readonly ProgressPart[]) {
+function runText(ui: Elements['terminal'], parts: readonly RunPart[]) {
   const { Text } = ui
-  return parts.map((p, i) => (
-    <Text color={color.dim}>
-      {i > 0 ? ' · ' : ''}
-      {p.key === 'tests' ? <Text color={p.ok ? color.pass : color.fail}>{p.text}</Text>
-        : p.key === 'files' ? countParts(p.text).map(c => (c.tone === undefined ? c.text : <Text color={c.tone === 'added' ? color.added : color.removed}>{c.text}</Text>))
-        : p.text}
-    </Text>
-  ))
+  return parts.map(p => <Text color={toneColor[p.tone]}>{p.text}</Text>)
 }
 
-/** Claude's task list while the turn runs: the bar and count, then a window of tasks, the running one in motion. */
-function drawPlan(ui: Elements['terminal'], plan: BandPlan, facts: readonly ProgressPart[]) {
+/** Claude's task list while the turn runs: the bar and count with the last thing that happened, then a window of tasks, the running one in motion. */
+function drawPlan(ui: Elements['terminal'], plan: BandPlan, last: readonly RunPart[]) {
   const { Box, Text, Raster } = ui
   const v = plan.view
-  // The running task's row says what Claude does now, so the facts leave out "now".
-  const rest = facts.filter(p => p.key !== 'now' && p.key !== 'calls')
   return (
     <Box key="tldr-plan" flexDirection="column">
       <Box key="tldr-plan-head" flexDirection="row" columnGap={1}>
-        <Text bold>TL;DR </Text>
+        <Text color={color.accent} bold>TL;DR </Text>
         <Raster key={PLAN_BAR_KEY} columns={plan.barColumns} rows={1} cells={plan.barCells} />
         <Text wrap="truncate-end">
           <Text>{`${v.done}/${v.total} tasks`}</Text>
-          {rest.length > 0 ? <Text color={color.dim}>{' · '}</Text> : null}
-          {progressText(ui, rest)}
+          {runText(ui, last)}
         </Text>
       </Box>
       {v.before > 0 ? <Text key="tldr-plan-before" color={color.dim}>{`  ${glyph.pass} ${v.before} earlier`}</Text> : null}

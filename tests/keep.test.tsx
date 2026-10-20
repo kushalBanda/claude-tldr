@@ -21,13 +21,13 @@ function host(on: On, stored: Record<string, unknown> = {}) {
 }
 
 test('toKept drops folded text and live state, caps the reply and the log', async () => {
-  const t = { ...startTurn('t', 'go', 0), interim: ['note'], reply: 'x'.repeat(3000), log: Array.from({ length: 100 }, (_, i) => `line ${i}`), pulse: { kind: 'change' as const, key: 'a', at: 1 } }
+  const t = { ...startTurn('t', 'go', 0), interim: ['note'], reply: 'x'.repeat(3000), log: Array.from({ length: 100 }, (_, i) => `line ${i}`), jump: { parts: [{ text: 'pytest ✓ 1 passed', tone: 'pass' as const }], at: 1 } }
   const k = toKept(t)
   expect(k.interim).toEqual([])
   expect(k.reply?.length).toBe(2000)
   expect(k.log.length).toBe(40)
   expect(k.log.at(-1)).toBe('line 99')
-  expect(k.pulse).toBeNull()
+  expect(k.jump).toBeNull()
 })
 
 test('after /compact the band points to the kept cards', async ($, on) => {
@@ -64,8 +64,8 @@ test('/tldr history opens the pane, and the pane lists the kept cards', async ($
   const pane = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'Pane', requestId: 'tldr-history', viewport: FULL, props: {} as never })
   const text = JSON.stringify(await pane.drawn())
   expect(text).toContain('fix the login bug')
-  expect(text).toContain('src/auth.py +12 −3')
-  expect(text).toContain('pytest ✓ 12 passed')
+  expect(text).toContain('src, tests')
+  expect(text).toContain('✓ 12 passed')
   expect(text).toContain('⚠ tests/conftest.py changed in the turn that made tests pass')
 })
 

@@ -162,10 +162,10 @@ test('bash writes: escaped quotes inside double quotes', async () => {
 
 test('summary: a line names what was read, searched and written', async () => {
   const call = (tool: string, input: unknown) => ({ tool, input, isRunning: false, isErrored: false })
-  expect(groupSummary([call('Read', { file_path: 'src/a.ts' })])).toEqual(['Read src/a.ts'])
-  expect(groupSummary(['a', 'b', 'c', 'a'].map(n => call('Read', { file_path: `src/${n}.ts` })))).toEqual(['Read src/a.ts, src/b.ts +1 more'])
-  expect(groupSummary([call('Grep', { pattern: 'decodeToken' }), call('Grep', { pattern: 'x' })])).toEqual(['2 searches'])
-  expect(groupSummary([call('Bash', { command: 'echo a > out/a.txt && echo b > out/b.txt && echo c > out/c.txt' })])).toEqual(['wrote out/a.txt, out/b.txt +1 more'])
+  expect(groupSummary([call('Read', { file_path: 'src/a.ts' })]).map(p => p.text)).toEqual(['Read src/a.ts'])
+  expect(groupSummary(['a', 'b', 'c', 'a'].map(n => call('Read', { file_path: `src/${n}.ts` }))).map(p => p.text)).toEqual(['Read src/a.ts, src/b.ts +1 more'])
+  expect(groupSummary([call('Grep', { pattern: 'decodeToken' }), call('Grep', { pattern: 'x' })]).map(p => p.text)).toEqual(['2 searches'])
+  expect(groupSummary([call('Bash', { command: 'echo a > out/a.txt && echo b > out/b.txt && echo c > out/c.txt' })]).map(p => p.text)).toEqual(['wrote out/a.txt, out/b.txt +1 more'])
 })
 
 test('bash writes: a variable the same command set names the path', async () => {
@@ -250,8 +250,8 @@ test('steps: a multi-word runner is a Test step, back-to-back code edits merge, 
 
 test('summary: more than two edits in one group read as one count', async () => {
   const edit = (f: string) => ({ tool: 'Edit', input: { file_path: f }, output: { structuredPatch: [{ lines: ['+x', '-y'] }] }, isRunning: false, isErrored: false })
-  expect(groupSummary([edit('a.go'), edit('b.go')])).toEqual(['a.go +1 −1', 'b.go +1 −1'])
-  expect(groupSummary([edit('a.go'), edit('b.go'), edit('c.go')])).toEqual(['edited 3 files +3 −3'])
+  expect(groupSummary([edit('a.go'), edit('b.go')]).map(p => p.text)).toEqual(['a.go +1 −1', 'b.go +1 −1'])
+  expect(groupSummary([edit('a.go'), edit('b.go'), edit('c.go')]).map(p => p.text)).toEqual(['edited 3 files +3 −3'])
 })
 
 test('changed pane: a big turn opens one line per folder, so it fits', async () => {
@@ -270,7 +270,7 @@ test('sandbox: a test run chained with a read counts both; filtered go output dr
 
 test('sandbox: Skill and TodoWrite count nowhere on the main screen', async () => {
   const call = (tool: string, input: unknown) => ({ tool, input, isRunning: false, isErrored: false })
-  expect(groupSummary([call('Skill', { skill: 'golang-testing' }), call('TodoWrite', { todos: [] }), call('Read', { file_path: 'a.go' })])).toEqual(['Read a.go'])
+  expect(groupSummary([call('Skill', { skill: 'golang-testing' }), call('TodoWrite', { todos: [] }), call('Read', { file_path: 'a.go' })]).map(p => p.text)).toEqual(['Read a.go'])
 })
 
 test('sandbox: a compound command counts each job, and the steps show each one', async () => {

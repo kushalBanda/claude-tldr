@@ -43,7 +43,7 @@ export function paneTitle(t: Turn, s: Section | 'all'): string {
   return s === 'all' ? `TL;DR · ${t.goal}` : `TL;DR · ${TITLE[s]}`
 }
 
-/** The commands behind the Ran row: log lines of calls that were not a read, search, change or test. */
+/** The commands behind key 5 (ran): log lines of calls that were not a read, search, change or test. */
 export function ranCommands(t: Turn): string[] {
   return (t.ranLog ?? []).map(l => l.replace(/^Bash /, ''))
 }
@@ -88,7 +88,7 @@ export function drawDetail(ui: Elements[RenderSurface], e: RenderInput<'Pane'> |
       {fact !== undefined ? tinted(fact, factColor) : null}
     </Box>
   )
-  const heading = (text: string) => tinted(text, color.label)
+  const heading = (text: string) => tinted(text, color.dim)
 
   const looked = () => (
     <Box flexDirection="column">
@@ -187,7 +187,7 @@ export function drawDetail(ui: Elements[RenderSurface], e: RenderInput<'Pane'> |
         {shown.map((s, i) => (
           <Box flexDirection="row" columnGap={1}>
             <Box width={3} flexShrink={0}><Text color={color.dim}>{String(first + i + 1).padStart(2)}</Text></Box>
-            <Box width={VERB_WIDTH} flexShrink={0}><Text color={color.label}>{stepVerb(s.kind)}</Text></Box>
+            <Box width={VERB_WIDTH} flexShrink={0}><Text color={color.dim}>{stepVerb(s.kind)}</Text></Box>
             {tone(s) === undefined ? <Text wrap="truncate-end">{tinted(s.text)}</Text> : <Text color={tone(s)} wrap="truncate-end">{s.text}</Text>}
             {s.count > 1 ? <Text color={color.dim}>{`×${s.count}`}</Text> : null}
             {s.isTest ? <Text color={flagged ? color.check : color.dim}>test file</Text> : null}

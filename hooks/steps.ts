@@ -1,6 +1,18 @@
-// The turn read three ways for the card and its pane: totals, files by folder, and the steps in order. Pure.
-import type { Change, Turn } from '../types'
+// The turn read four ways for the card and its pane: its verdict, totals, files by folder, and the steps in order. Pure.
+import type { Change, Tone, Turn } from '../types'
 import { few, shortPath } from './classify'
+import { testLabel } from './summary'
+
+export type Verdict = Tone | 'none' | 'running'
+
+/** How the turn went, in one word: tests that end red first, then a flag to check, then green; `none` with no test run. */
+export function verdictOf(t: Pick<Turn, 'endedAt' | 'flags' | 'testRuns'>): Verdict {
+  if (t.endedAt === null) return 'running'
+  const last = t.testRuns.at(-1)
+  if (last !== undefined && !testLabel(last).ok) return 'fail'
+  if (t.flags.length > 0) return 'check'
+  return last === undefined ? 'none' : 'pass'
+}
 
 export type Totals = { files: number; added: number; removed: number; counted: boolean }
 

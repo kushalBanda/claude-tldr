@@ -1,4 +1,4 @@
-// The user's feature switches. Slice 9 adds them to the plugin's settings; until then all are on.
+// The user's feature switches, from the plugin's settings; each is on unless turned off.
 import type { PluginOptions } from 'claude-code'
 
 export type Features = {
@@ -9,6 +9,7 @@ export type Features = {
   keep: boolean
   actions: boolean // clean copy, diff
   context: boolean // the context bar above the prompt
+  notify: boolean // a notification and a status line when a long turn ends
 }
 
 function flag(options: PluginOptions, key: string): boolean {
@@ -17,5 +18,14 @@ function flag(options: PluginOptions, key: string): boolean {
 
 export function readFeatures(options: PluginOptions): Features {
   const card = flag(options, 'card')
-  return { card, motion: flag(options, 'motion'), animation: flag(options, 'animation'), trust: card && flag(options, 'trust'), keep: card && flag(options, 'keep'), actions: card && flag(options, 'actions'), context: flag(options, 'context') }
+  return {
+    card,
+    motion: flag(options, 'motion'),
+    animation: flag(options, 'animation'),
+    trust: card && flag(options, 'trust'),
+    keep: card && flag(options, 'keep'),
+    actions: card && flag(options, 'actions'),
+    context: flag(options, 'context'),
+    notify: card && flag(options, 'notify'),
+  }
 }

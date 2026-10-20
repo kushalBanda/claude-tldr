@@ -1,4 +1,4 @@
-// Calls a summary line cannot name stack into the card's Ran row; /compact moves the spinner while it runs.
+// Calls a summary line cannot name stack into one line on the card; /compact moves the spinner while it runs.
 import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
@@ -53,20 +53,19 @@ test('main screen: a row the line can name still draws its line', async ($, on) 
   expect(await drawn($, row('s-0', 'cat src/auth.py'))).toContain('Read src/auth.py')
 })
 
-test('card: the commands stack into one Ran row', async ($, on) => {
+test('card: a turn that only ran commands says what it ran, stacked', async ($, on) => {
   engine(on)
   await playCommands($)
   const text = await drawn($, row('r-0', COMMANDS[0]!, FULL))
-  expect(text).toContain('"Ran"')
-  expect(text).toContain('git ×3 · gh')
+  expect(text).toContain('ran git ×3 · gh')
 })
 
-test('card: a turn with no such call has no Ran row', async ($, on) => {
+test('card: a turn that changed files does not list what it ran', async ($, on) => {
   engine(on)
   await $.turn.start({ turnId: 'e', text: 'edit' } as never)
   await $.tool.call({ tool: 'Edit', file_path: 'src/a.ts', old_string: 'a', new_string: 'b', tool_use_id: 'e-0' } as never)
   await $.turn.complete({ turnId: 'e', answer: 'done' } as never)
-  expect(await drawn($, row('e-0', '', FULL))).not.toContain('"Ran"')
+  expect(await drawn($, row('e-0', '', FULL))).not.toContain('ran ')
 })
 
 const MESSAGES = [{ role: 'user', text: 'summary of earlier work', toolUses: [] }]
