@@ -1,6 +1,6 @@
 {
   "name": "claude-tldr",
-  "description": "TL;DR for Claude Code: every turn as one card.",
+  "description": "TL;DR for Claude Code: every turn as one row.",
   "owner": {
     "name": "Kushal Banda",
     "url": "https://github.com/kushalBanda"
@@ -9,7 +9,7 @@
     {
       "name": "tldr",
       "source": "./",
-      "description": "TL;DR for Claude Code: every turn as one card, with what to check.",
+      "description": "TL;DR for Claude Code: every turn as one row, with what to check.",
       "version": "0.1.5"
     }
   ]

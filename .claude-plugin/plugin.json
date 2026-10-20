@@ -2,7 +2,7 @@
   "name": "tldr",
   "displayName": "TL;DR for Claude Code",
   "version": "0.1.5",
-  "description": "TL;DR for Claude Code: every turn as one card, with what to check.",
+  "description": "TL;DR for Claude Code: every turn as one row, with what to check.",
   "author": {
     "name": "Kushal Banda",
     "url": "https://github.com/kushalBanda"
@@ -17,7 +17,7 @@
   "userConfig": {
     "card": {
       "type": "boolean",
-      "title": "Turn card",
+      "title": "Turn row",
       "description": "Fold each turn's tool calls into one TL;DR row: what changed, how the tests went, what to check. Off: Claude Code draws its own rows, and trust, keep, actions and notify turn off too.",
       "default": true
     },
@@ -42,13 +42,13 @@
     "trust": {
       "type": "boolean",
       "title": "Trust flags",
-      "description": "Flag what to check, one line each on the card: test files changed to pass, writes outside the project, deletes, skipped tests, --no-verify or force push.",
+      "description": "Flag what to check, one line each under the row: test files changed to pass, writes outside the project, deletes, skipped tests, --no-verify or force push.",
       "default": true
     },
     "keep": {
       "type": "boolean",
-      "title": "Keep cards",
-      "description": "Save finished cards so they stay after /compact and a resume. /tldr history lists them.",
+      "title": "Keep rows",
+      "description": "Save finished rows so they stay after /compact and a resume. /tldr history lists them.",
       "default": true
     },
     "actions": {
@@ -66,7 +66,7 @@
   },
   "keywords": [
     "transcript",
-    "turn card",
+    "turn summary",
     "tests",
     "diff",
     "compact",

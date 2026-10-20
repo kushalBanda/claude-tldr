@@ -47,9 +47,9 @@ Also: when a turn over 30 seconds ends, a notification carries its verdict, and 
 | Command | Does |
 | --- | --- |
 | `/tldr` | Help. |
-| `/tldr show [row]` | Open what's behind the latest card: `changed`, `tests`, `check`, `ran`, `looked`, `notes`. With no row, the steps of the turn in order. Escape closes it. |
+| `/tldr show [row]` | Open what's behind a line of the latest row: `changed`, `tests`, `check`, `ran`, `looked`, `notes`. With no row, the steps of the turn in order. Escape closes it. |
 | `/tldr context` | Open the context pane: each category that fills the window, with its tokens and share. |
-| `/tldr history` | Open the kept cards of this session, newest first. |
+| `/tldr history` | Open the kept rows of this session, newest first. |
 | `/tldr copy` | Copy the latest reply as clean text: no trailing spaces, no shared indentation. |
 | `/tldr diff` | Print the net change of the latest turn per file, as a unified diff. |
 
@@ -84,7 +84,7 @@ pytest, unittest, jest, vitest, Playwright, go test, gotestsum, cargo test and n
 <summary><b>Privacy and trust</b></summary>
 
 - **No network.** TL;DR makes no network calls and starts no processes.
-- **Local only.** It reads the tool calls and results of your session, and the files Claude edits, to build the net diff. The context bar uses Claude Code's local estimate of the window, so it sends no request. Kept cards stay in Claude Code's local plugin store: one list per session, at most 50 cards, without diff bodies. The same store keeps how long each Bash command took, at most 100 per project, for the band's ring.
+- **Local only.** It reads the tool calls and results of your session, and the files Claude edits, to build the net diff. The context bar uses Claude Code's local estimate of the window, so it sends no request. Kept rows stay in Claude Code's local plugin store: one list per session, at most 50 rows, without diff bodies. The same store keeps how long each Bash command took, at most 100 per project, for the band's ring.
 - **Notifications.** A turn over 30 seconds ends with a notification through your own Claude Code notification setting. The `notify` switch turns it off.
 - **Hooks that see other calls.** It hooks `command.run` only to answer its own `/tldr` command, and `tool.call` only to read each call and its result, which it passes back unchanged. It never changes or blocks a call.
 - **Check it yourself.** Before you install, run `claude plugin validate` on a clone. The `hooks:` and `calls:` lines list every event the mod handles and every API it calls.
@@ -96,7 +96,7 @@ pytest, unittest, jest, vitest, Playwright, go test, gotestsum, cargo test and n
 
 - Changes made through Bash count when they use a redirect, a heredoc, `tee`, `sed -i`, `perl -i`, `cp`, `mv`, `touch`, `git checkout -- path` or `git restore`. They show as `path via Bash`, without line counts. Writes from scripts (`python x.py`), `git apply` and `git stash pop` don't show. A path built from a variable (`> $OUT`) is left out.
 - A `cd` counts inside one command (`cd app && touch x`), but not when it ran in an earlier call.
-- When grep or tail cuts `go test` output, the card keeps the failures it sees but drops the pass count. A summary line (gotestsum, or a wrapper's own) keeps all counts.
+- When grep or tail cuts `go test` output, the row keeps the failures it sees but drops the pass count. A summary line (gotestsum, or a wrapper's own) keeps all counts.
 - Bulk deletes (`find -delete`, `git clean -f`, `xargs rm`) are flagged by command, not file by file.
 - A task runner that starts two test runners (`make test` that runs `go test` and then `vitest`) shows the first summary it finds, not the sum.
 - The custom spinner takes the place of Claude Code's spinner line, so the token count doesn't show. Switch `motion` off to get it back.
@@ -117,7 +117,7 @@ claude plugin test .           # the test suite (tests/*.test.ts*)
 
 The mod is TypeScript with no dependencies. Render hooks are pure, and all parsing is static: TL;DR never runs a command to learn what a command did. See [CONTRIBUTING.md](CONTRIBUTING.md) to send a change.
 
-The images in this README are mock-ups of the mod's output, drawn by `node scripts/shots.mjs`.
+The images in this README are mock-ups of the mod's output for the turn in `tests/fixtures/login-bug.ts`.
 
 </details>
 
