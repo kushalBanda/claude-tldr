@@ -7,6 +7,10 @@
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-2.1.301%2B-d77757.svg)
 ![No network calls](https://img.shields.io/badge/network%20calls-none-success.svg)
 
+**Listed on** [![claudecodemods.com](https://img.shields.io/badge/claudecodemods.com-tldr-d77757.svg)](https://claudecodemods.com/extensions/claude-tldr)
+[![claudemods.dev](https://img.shields.io/badge/claudemods.dev-tldr-d77757.svg)](https://claudemods.dev/en/builds/tldr-825fdb)
+[![claudemods.si](https://img.shields.io/badge/claudemods.si-tldr-d77757.svg)](https://claudemods.si/mods/tldr-kushalbanda)
+
 ![Left: a Claude Code turn as 33 lines of reads, edits and test logs. Right: the same turn as one line per tool group, then a three-line TL;DR row with an amber dot that flags the changed test file, the row keys and the prompt hint.](.github/assets/before-after.png)
 
 ![33 lines become 3. The dot turns amber and each edit that can fake a green run gets its own line. No network calls.](.github/assets/value.png)
@@ -20,8 +24,6 @@ In a Claude Code terminal session, type:
 ```
 
 Answer `y` to add the marketplace, then pick a scope (user is the first one). The mod starts at once, with no restart. It needs Claude Code 2.1.301 or later.
-
-Also listed on [claudecodemods.com](https://claudecodemods.com/extensions/claude-tldr), [claudemods.dev](https://claudemods.dev/en/builds/tldr-825fdb) and [claudemods.si](https://claudemods.si/mods/tldr-kushalbanda).
 
 ## Features
 
