@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6
+
+- **Context bar after /compact:** the bar now shows the compacted conversation. Before, it measured the transcript before the new one was in place, so it kept the old figures until the next request.
+
 ## 0.1.5
 
 - **The card is a row:** each turn ends with a row in the transcript's own style, `⏺ TL;DR <goal> · 52s`, and under `⎿` what changed and how the tests went, then one line per thing to check. The dot's color is the verdict: green, red, amber for a flag, gray with no test run. No box, no labels. More than one file reads as its size and folders, so a 60-file refactor stays one line.

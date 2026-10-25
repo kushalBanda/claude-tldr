@@ -55,6 +55,9 @@ let inlineFor: { turnId: string; section: Section | 'all' } | null = null
 // The context window by category, as the band's bar draws it: measured after each request (a local estimate).
 let contextNow: ContextFill | null = null
 let measuring = false
+// A measure asked while one runs: that one may read the transcript from before a change, so it runs again after.
+let measureAgain = false
+const COMPACT_SETTLE_MS = 250
 // Each edited file's text before the open turn's first edit of it, for the turn's net diff (null: too large).
 let openTurnId: string | null = null
 let befores = new Map<string, string | null>()
@@ -372,7 +375,8 @@ export const register: Register = (on, options) => {
       if (!inTurn) endLoop()
     })
     if (f.keep && e.agentId === undefined && 'messages' in r) await setKept($, k => ({ ...k, note: k.count > 0 })).catch(() => {})
-    if (f.context && e.agentId === undefined) await measureContext($)
+    // The engine puts the compacted messages in place after the chain returns: measured now, the bar keeps the old figures.
+    if (f.context && e.agentId === undefined && 'messages' in r && e.trigger !== 'precompute') $.clock.after(COMPACT_SETTLE_MS, () => void measureContext($))
     return r
   })
 
@@ -471,8 +475,12 @@ function inlineOpen($: EngineInterface, e: RenderInput<'ToolGroup'> | RenderInpu
 
 /** The context window by category, as /context counts it but estimated locally, so it costs no request. */
 async function measureContext($: EngineInterface) {
-  if (measuring) return
+  if (measuring) {
+    measureAgain = true
+    return
+  }
   measuring = true
+  measureAgain = false
   try {
     const u = await $.session.usage({ breakdown: 'summary' })
     const b = u.context.breakdown
@@ -485,6 +493,7 @@ async function measureContext($: EngineInterface) {
   } finally {
     measuring = false
   }
+  if (measureAgain) await measureContext($)
 }
 
 async function openContext($: EngineInterface) {
