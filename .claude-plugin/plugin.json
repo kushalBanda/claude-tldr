@@ -1,7 +1,7 @@
 {
   "name": "tldr",
   "displayName": "TL;DR for Claude Code",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "TL;DR for Claude Code: every turn as one row, with what to check.",
   "author": {
     "name": "Kushal Banda",

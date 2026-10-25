@@ -1,5 +1,5 @@
 // The context bar: the conversation (what /compact frees), the setup, and the room left, with a label that names each color.
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { CONVERSATION_RGB, contextCells, conversationRgb, FULL_RGB, WARN_RGB, contextFill, contextLevel, SETUP_RGB, sliceWidths, tokens } from '../hooks/context'
@@ -64,4 +64,22 @@ test('context off: no bar, and the command says so', { options: { context: false
   const r = await $.command.run({ command: 'tldr', args: 'context', origin: { kind: 'composer' } } as never)
   expect(r.text).toContain('off')
   expect(JSON.stringify(await (await $.ui.mount(band)).drawn())).not.toContain('tldr-context-bar')
+})
+
+test('after /compact the bar reads the conversation the engine put in place, not the one it replaced', async ($, on) => {
+  const clock = mock.clock(on)
+  // The engine installs the compacted messages after the chain returns: until then a measure reads the old ones.
+  let installed = false
+  const AFTER = { ...BREAKDOWN, categories: [cat('System prompt', 9_000), cat('Messages', 12_000), cat('Free space', 146_000, 'free'), cat('Autocompact buffer', 33_000, 'buffer')], totalTokens: 21_000, percentage: 11 }
+  on('session.usage', async () => ({ value: { startedAt: 0, rateLimits: [], cost: {}, context: { tokens: 0, window: 200_000, breakdown: installed ? AFTER : BREAKDOWN } } }) as never)
+  on('session.compact', async (_$, e) => ({ messages: e.messages }) as never)
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e) => $.ui.resolve(e).Text({ children: 'engine band' } as never) as never)
+  await $.command.run({ command: 'tldr', args: 'context', origin: { kind: 'composer' } } as never)
+  await $.session.compact({ trigger: 'manual', messages: [{ role: 'user', text: 'summary', toolUses: [] }] } as never)
+  installed = true
+  await clock.advance(1000)
+  const text = JSON.stringify(await (await $.ui.mount(band)).drawn())
+  expect(text).toContain('11% full')
+  expect(text).toContain('conversation 12k')
 })
